@@ -88,7 +88,11 @@ Idea behind copulas:
 
 - Tail dependence is when the correlation between two variables increases as you get "further" in the tail (either or both) of the distribution. Gaussian copula has no tail dependence.
 
+<<<<<<< HEAD
 ----------------------------to delete------------------------------  
+=======
+----------------------------to delete------------------------------
+>>>>>>> 44fb48bc34e045e0266b243015df6502e256583d
 Medical Justification for Grouping Variables:  
 
 1. Glucose & Cholesterol (Metabolic Block)  
@@ -148,7 +152,11 @@ corr_matrix <- cor(data_copula_t) %>% as.data.frame()
 knitr::kable(corr_matrix, caption = "Correlation Matrix of t_copula", digits = 3)
 ```
 
+<<<<<<< HEAD
 ----------------------------to delete------------------------------  
+=======
+----------------------------to delete------------------------------
+>>>>>>> 44fb48bc34e045e0266b243015df6502e256583d
 
 A t-Copula is ideal for modeling correlated medical data with heavy tails, capturing realistic dependencies between variables.  
 
@@ -300,4 +308,9 @@ comparison_matrix <- data.frame(
 knitr::kable(comparison_matrix, 
              caption = "Comparison of Target vs. Empirical Correlations", 
              digits = 3)
+<<<<<<< HEAD
 ```
+=======
+```
+
+>>>>>>> 44fb48bc34e045e0266b243015df6502e256583d
