@@ -383,9 +383,8 @@ mu &lt;- c(100,   # Mean Glucose Level (mg/dL)
 <ul>
 <li>Degrees of Freedom (nu = 5)</li>
 </ul>
-<p>A lower degrees of freedom (e.g., 5) results in a heavier tail, which
-better simulates extreme cases in medical data, such as patients with
-diabetes or obesity.</p>
+<p>Lower degrees of freedom results in a heavier tail, which better
+simulates extreme cases in medical data (diabetes, obesity, etc.).</p>
 <ul>
 <li>Number of Variables (p = 4)</li>
 </ul>
@@ -412,6 +411,44 @@ Sigma &lt;- bdiag(block1, block2)
 # Convert to a standard matrix format
 # Ensure the correlation matrix is positive definite
 Sigma &lt;- as.matrix(nearPD(Sigma)$mat) </code></pre>
+<p>Copulas are the mechanism which allows us to isolate the dependency
+structure in a multivariate distribution. In particular, we can
+construct any multivariate distribution by separately specifying the
+marginal distributions and the copula. (Haugh, 2016) <a href="https://www.columbia.edu/~mh2078/QRM/Copulas.pdf" class="uri">https://www.columbia.edu/~mh2078/QRM/Copulas.pdf</a></p>
+<p>Idea behind copulas:</p>
+<ul>
+<li><p>It is a mathematical object that has input as 2 or more marginal
+distributions and has output as a joint distribution</p></li>
+<li><p>If we have two probabilities that live on 0 -&gt; 1, we can
+transform them into a higher space of 0 to infinity. Then when we add
+them together, they still live in the space of 0 to infinity. We take
+the inverse transformation of the sum, so the sum of the two
+probabilities will live on 0 -&gt; 1 again.</p></li>
+<li><p>If we use a negative log transformation (which will put any
+probability from 0 to 1 on a scale from 0 to infinity), the inverse will
+be negative exponential transformation (which brings anything from 0 to
+infinity back to 0 to 1).</p></li>
+<li><p>If the two probabilities are independent, the joint probability
+is equal to the product of the individual probabilities
+(Frechet-Hoffding boundary copula). We’re not so interested in it
+because we want to use copulas for distributions with
+correlation.</p></li>
+<li><p>Copula allows distributions that have dependency to have
+flexibility. e.g. Gumbel copula - dependency increases with extreme
+positive values, which captures the dependency better than any
+multivariate distribution.</p></li>
+<li><p>Gaussian copula transforms variables to standard normal
+distributions (mean = 0, variance = 1) by mapping them on a
+percentile-to-percentile basis. Those distributions are then combined to
+form a joint distribution</p></li>
+<li><p>The t-copula is derived from the multivariate t-distribution,
+just as the Gaussian copula comes from the multivariate normal. t-copula
+better captures the phenomenon of dependent extreme values (tail
+dependence)</p></li>
+<li><p>Tail dependence is when the correlation between two variables
+increases as you get “further” in the tail (either or both) of the
+distribution. Gaussian copula has no tail dependence.</p></li>
+</ul>
 <p>—————————-to delete—————————— Medical Justification for Grouping
 Variables:</p>
 <ol style="list-style-type: decimal">

@@ -38,7 +38,7 @@ mu <- c(100,   # Mean Glucose Level (mg/dL)
 
 - Degrees of Freedom (nu = 5)
 
-A lower degrees of freedom (e.g., 5) results in a heavier tail, which better simulates extreme cases in medical data, such as patients with diabetes or obesity.  
+Lower degrees of freedom results in a heavier tail, which better simulates extreme cases in medical data (diabetes, obesity, etc.).  
 
 
 - Number of Variables (p = 4)
@@ -68,6 +68,25 @@ Sigma <- bdiag(block1, block2)
 Sigma <- as.matrix(nearPD(Sigma)$mat) 
 ```
 
+Copulas are the mechanism which allows us to isolate the dependency structure in a multivariate distribution. In particular, we can construct any multivariate distribution by separately specifying the marginal distributions and the copula. (Haugh, 2016) https://www.columbia.edu/~mh2078/QRM/Copulas.pdf
+
+Idea behind copulas:
+
+- It is a mathematical object that has input as 2 or more marginal distributions and has output as a joint  distribution
+
+- If we have two probabilities that live on 0 -> 1, we can transform them into a higher space of 0 to infinity. Then when we add them together, they still live in the space of 0 to infinity. We take the inverse transformation of the sum, so the sum of the two probabilities will live on 0 -> 1 again.
+
+- If we use a negative log transformation (which will put any probability from 0 to 1 on a scale from 0 to infinity), the inverse will be negative exponential transformation (which brings anything from 0 to infinity back to 0 to 1).
+
+- If the two probabilities are independent, the joint probability is equal to the product of the individual probabilities (Frechet-Hoffding boundary copula). We're not so interested in it because we want to use copulas for distributions with correlation.
+
+- Copula allows distributions that have dependency to have flexibility. e.g. Gumbel copula - dependency increases with extreme positive values, which captures the dependency better than any multivariate distribution.
+
+- Gaussian copula transforms variables to standard normal distributions (mean = 0, variance = 1) by mapping them on a percentile-to-percentile basis. Those distributions are then combined to form a joint distribution 
+
+- The t-copula is derived from the multivariate t-distribution, just as the Gaussian copula comes from the multivariate normal. t-copula better captures the phenomenon of dependent extreme values (tail dependence)
+
+- Tail dependence is when the correlation between two variables increases as you get "further" in the tail (either or both) of the distribution. Gaussian copula has no tail dependence.
 
 ----------------------------to delete------------------------------
 Medical Justification for Grouping Variables:  
