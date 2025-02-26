@@ -308,9 +308,119 @@ comparison_matrix <- data.frame(
 knitr::kable(comparison_matrix, 
              caption = "Comparison of Target vs. Empirical Correlations", 
              digits = 3)
-<<<<<<< HEAD
-```
-=======
 ```
 
->>>>>>> 44fb48bc34e045e0266b243015df6502e256583d
+# Part 3
+
+## Simulation Study 1
+
+*Note: we have done this for a multivariable dist. with 4 variables rather than 2... harder to visualize/keep track of all of the different covars (since there are 6 pairwise correlations/regressions)*
+
+### 3.1 Fit a regression model to the simulated data while assuming that data are i.i.d and normally distributed
+
+```{r simstudy1_1}
+# Linear regression -- assumes iid and X ~ N() [i.e. errors/residuals ~ N()]
+
+# Generate a dataset with 1000 samples and df = 5
+nn_3_1 = 1000
+df_3_1 = 5
+generated_data_3_1 <- generate_t_copula_data(n = nn_3_1, nu = df_3_1)
+
+# function for storing beta & 95% CI from each pairwise reg
+pairwise_linreg_storebeta <- function(gen_data, samp_size){
+  lm_out <- list()
+  for (ii in colnames(gen_data)){
+    for (jj in colnames(gen_data)){
+      # same variable
+      if (ii == jj){ # pass
+      }
+      # 6 unique pairwise regressions for four variables (3 + 2 + 1)
+      else{
+        linreg <- lm(gen_data[[ii]] ~ gen_data[[jj]]) # ii = y ~ jj = x
+        beta <- linreg$coefficients[2] # regression coefficient
+        lower <- confint(linreg)[2] # UB & LB of 95% CI for reg coeff
+        upper <- confint(linreg)[4]
+        # store output, named
+        lm_out[[paste0(ii, "_", jj)]] <- c(vars = paste0(ii,"_", jj), samp_size = samp_size, beta=beta, lower=lower, upper=upper)  # stored as y_x
+      }
+    }
+  }
+  return(lm_out)
+}
+```
+
+### 3.2 Conduct a simulation study that varies sample sizes, correlation levels, or degree of non-normality to assess bias in parameter estimates, type I error in hypothesis testing and coverage in conference intervals.
+
+*Interpretation: 'parameter estimates' refers to correlation only (not beta or intercept for simple linear regression)*
+
+* Note: as per instructions, I have fit a regression model. However, the easier way to calculate this would be with cor() in R. Is there a theoretical solution for the linear regression output? In that case, assessing CIs & bias would be simple. However, since I'm not 100% clear on the code under "# Generate Independent Heavy-Tailed t-Distributions", I'm not clear what those theoretical values would be... 
+* Will be very easy to plot the single theoretical value when I have that cleared up [and will be obvious whether the 95% CI includes/covers it]
+
+```{r simstudy1_2}
+# 3.2.1 Vary sample size
+
+# 10 different sample sizes -- explore different orders of magnitude of sample size, rounded
+sampsize_3_2 <- ceiling(10^seq(1,4.5,length.out=10))
+
+# generate samples & store correlations
+# degree of skewness/variation from normality is fixed for these simulations (df)
+df_3_2 = 5
+lm_varysampsize_store <- list()
+
+# assess bias in parameter estimates, CI coverage (true value included/not included in 95% CI) [implies future Type I/II errors]
+
+# neater approach: extract beta & 95% CI [**note: under assumption of ~ iid, N(] (!)
+for (ii in sampsize_3_2){
+  generated_data_loop <- generate_t_copula_data(n = ii, nu = df_3_2)
+  lm_varysampsize_store[[paste0("sampsize", ii)]] <- c(pairwise_linreg_storebeta(generated_data_loop, samp_size = ii))
+}
+
+# collapse & plot all
+testing <- as.data.frame(t(as.data.frame((c(lm_varysampsize_store))))) # 120 obs-nice
+rownames(testing) <- seq(1,nrow(testing))
+colnames(testing)[3] <- "beta"
+testing$beta <- as.numeric(testing$beta)
+testing$upper <- as.numeric(testing$upper)
+testing$lower <- as.numeric(testing$lower)
+
+# plot -- examples...
+testing_plot <- testing |> filter(vars == "Glucose_Cholesterol")
+ggplot(data=testing_plot, aes(x = as.numeric(samp_size), y = beta)) +
+
+  geom_point() +
+
+  geom_errorbar(aes(ymin = as.numeric(lower), ymax = as.numeric(upper)), width = 0.2, position = position_dodge(width = 0.9)) + 
+  
+  facet_grid(rows = vars(vars)) + 
+
+  scale_x_log10() 
+
+# and for the other relationship of interest
+testing_plot1 <- testing |> filter(vars == "BMI_BloodPressure")
+ggplot(data=testing_plot1, aes(x = as.numeric(samp_size), y = beta)) +
+
+  geom_point() +
+
+  geom_errorbar(aes(ymin = as.numeric(lower), ymax = as.numeric(upper)), width = 0.2, position = position_dodge(width = 0.9)) + 
+  
+  facet_grid(rows = vars(vars)) + 
+
+  scale_x_log10() 
+
+# would prefer to plot them all in facets, if we are sticking with the 4 variables/6 pairwise correlations
+
+# would add a HORIZONTAL LINE to each at the true theoretical value
+```
+
+
+```{r simstudy1_2}
+# 3.2.2 Vary degree of non-normality
+
+# it says "or" -- is it supposed to be "and", i.e. check all of these things?
+# coding it would be super simple once the structure above^^ is formalized
+
+```
+
+
+
+
