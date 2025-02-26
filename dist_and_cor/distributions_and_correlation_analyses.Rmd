@@ -1,29 +1,31 @@
 ---
-title: "distributions_and_correlation_analyses"
+title: "Project 1: Multivariate Non-Normal Distributions and Correlated Data"
 output: html_document
 ---
 
-# 1.Plan and specify distributions and correlation
+# 1. Plan and specify distributions and correlation
 
-The purpose of this code is to simulate medical data with heavy-tailed characteristics using a t-Copula to generate correlated variables (such as Glucose, Cholesterol, BMI, and Blood Pressure).  
+We simulate medical data with heavy-tailed a Multivariate t-Distribution using a t-Copula to generate correlated variables: Glucose, Cholesterol, BMI, and Blood Pressure).  
 
-We model the data using a **Multivariate t-Distribution** and apply a t-Copula to introduce correlations, ensuring that the generated dataset aligns with the statistical properties of real-world medical data.  
 
-```{r set_parameters, message=FALSE, warning=FALSE}
+```{r load_packages, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(MASS)  
 library(Matrix)
 library(copula)
-library(mvtnorm)   # For multivariate t-distribution
+library(mvtnorm)
 library(ggplot2) 
 library(GGally)
 library(DT)
 library(patchwork)
+```
 
-set.seed(123)
+
+```{r set_parameters, message=FALSE}
+set.seed(2025)
 
 # Define parameters
-nu <- 5  # Degrees of freedom (controls tail thickness)
+nu <- 3  # Degrees of freedom (controls tail thickness)
 p <- 4   # Number of variables
 n <- 1000  # Number of samples
 
@@ -34,24 +36,23 @@ mu <- c(100,   # Mean Glucose Level (mg/dL)
         120)   # Mean Blood Pressure (mmHg)
 ```
 
-1. Degrees of Freedom *(nu = 5)*
-A lower degrees of freedom (e.g., 5) results in a heavier tail, which better simulates extreme cases in medical data, such as patients with diabetes or obesity.  
-Higher degrees of freedom make the data closer to a normal distribution, but medical data is often non-normal, making the t-distribution a better fit.  
+- Degrees of Freedom (nu = 5)
 
-2. Number of Variables *(p = 4)*  
-These four variables (Glucose, Cholesterol, BMI, Blood Pressure) are commonly used metabolic and cardiovascular health indicators.  
-In real-world data, these variables often exhibit correlations, making them suitable for a correlation-based simulation.  
+Lower degrees of freedom results in a heavier tail, which better simulates extreme cases in medical data (diabetes, obesity, etc.).  
 
-3. Choice of Mean Values *(mu)*  
-The mean values are set based on realistic medical data:  
-*Glucose:* Typically ranges from 70-140 mg/dL, so setting the mean to 100 mg/dL is reasonable.  
-*Cholesterol:* A normal range is 150-250 mg/dL, making 200 mg/dL a suitable average.  
-*BMI:* Normal BMI falls between 18-30, so 25 is a standard mean.  
-*Blood Pressure:* Healthy blood pressure ranges from 90-140 mmHg, making 120 mmHg an appropriate mean.  
+
+- Number of Variables (p = 4)
+
+These four variables (Glucose, Cholesterol, BMI, Blood Pressure) are commonly used metabolic and cardiovascular health indicators and are correlated to each other.
+
+- Choice of Mean Values (mu)  
+The mean values are set based on typical values of a healthy adult.
+
 
 ```{r corr_structure}
 # Define block structures
 # Block-diagonal: high correlation within groups, no correlation across groups
+
 # Glucose & Cholesterol (Metabolism)
 block1 <- matrix(c(1, 0.5, 
                    0.5, 1), nrow=2, ncol=2) 
@@ -67,8 +68,27 @@ Sigma <- bdiag(block1, block2)
 Sigma <- as.matrix(nearPD(Sigma)$mat) 
 ```
 
-A **block-diagonal correlation structure** is chosen to reflect real-world physiological relationships in medical data, ensuring that highly related variables are grouped together while unrelated ones remain independent.  
+Copulas are the mechanism which allows us to isolate the dependency structure in a multivariate distribution. In particular, we can construct any multivariate distribution by separately specifying the marginal distributions and the copula. (Haugh, 2016) https://www.columbia.edu/~mh2078/QRM/Copulas.pdf
 
+Idea behind copulas:
+
+- It is a mathematical object that has input as 2 or more marginal distributions and has output as a joint  distribution
+
+- If we have two probabilities that live on 0 -> 1, we can transform them into a higher space of 0 to infinity. Then when we add them together, they still live in the space of 0 to infinity. We take the inverse transformation of the sum, so the sum of the two probabilities will live on 0 -> 1 again.
+
+- If we use a negative log transformation (which will put any probability from 0 to 1 on a scale from 0 to infinity), the inverse will be negative exponential transformation (which brings anything from 0 to infinity back to 0 to 1).
+
+- If the two probabilities are independent, the joint probability is equal to the product of the individual probabilities (Frechet-Hoffding boundary copula). We're not so interested in it because we want to use copulas for distributions with correlation.
+
+- Copula allows distributions that have dependency to have flexibility. e.g. Gumbel copula - dependency increases with extreme positive values, which captures the dependency better than any multivariate distribution.
+
+- Gaussian copula transforms variables to standard normal distributions (mean = 0, variance = 1) by mapping them on a percentile-to-percentile basis. Those distributions are then combined to form a joint distribution 
+
+- The t-copula is derived from the multivariate t-distribution, just as the Gaussian copula comes from the multivariate normal. t-copula better captures the phenomenon of dependent extreme values (tail dependence)
+
+- Tail dependence is when the correlation between two variables increases as you get "further" in the tail (either or both) of the distribution. Gaussian copula has no tail dependence.
+
+----------------------------to delete------------------------------  
 Medical Justification for Grouping Variables:  
 
 1. Glucose & Cholesterol (Metabolic Block)  
@@ -89,12 +109,31 @@ copula_t <- tCopula(param=rho_vec, dim=p, df=nu, dispstr="un")
 # Generate Copula-Based Uniform Samples
 U_t <- rCopula(1000, copula_t) 
 
+# Define upper and lower bounds for each variable
+glucose_min <- 32  # minimum plausible fasting glucose level in mg/dL
+glucose_max <- 500 # maximum plausible fasting glucose level in mg/dL
+
+cholesterol_min <- 100  # minimum plausible cholesterol level in mg/dL
+cholesterol_max <- 300  # maximum plausible cholesterol level in mg/dL
+
+BMI_min <- 15    # minimum plausible BMI
+BMI_max <- 40    # maximum plausible BMI
+
+blood_pressure_min <- 90   # minimum plausible systolic blood pressure in mmHg
+blood_pressure_max <- 180  # maximum plausible systolic blood pressure in mmHg
+
 # Generate Independent Heavy-Tailed t-Distributions
-# Use scale() to avoid the variance might be too high for a realistic medical dataset
-glucose <- scale(rt(1000, df=nu)) * 15 + mu[1]
-cholesterol <- scale(rt(1000, df=nu)) * 25 + mu[2]
-BMI <- scale(rt(1000, df=nu)) * 3 + mu[3]
-blood_pressure <- scale(rt(1000, df=nu)) * 10 + mu[4]
+glucose_raw <- scale(rt(10000, df=nu)) * 15 + mu[1]
+cholesterol_raw <- scale(rt(10000, df=nu)) * 25 + mu[2]
+BMI_raw <- scale(rt(10000, df=nu)) * 3 + mu[3]
+blood_pressure_raw <- scale(rt(10000, df=nu)) * 10 + mu[4]
+
+# Filter out values that fall outside the realistic human limits
+glucose <- glucose_raw[glucose_raw >= glucose_min & glucose_raw <= glucose_max]
+cholesterol <- cholesterol_raw[cholesterol_raw >= cholesterol_min & cholesterol_raw <= cholesterol_max]
+BMI <- BMI_raw[BMI_raw >= BMI_min & BMI_raw <= BMI_max]
+blood_pressure <- blood_pressure_raw[blood_pressure_raw >= blood_pressure_min & blood_pressure_raw <= blood_pressure_max]
+
 
 # Map Copula Uniform Samples Back to Heavy-Tailed t-Distributions
 data_copula_t <- data.frame(
@@ -108,6 +147,8 @@ data_copula_t <- data.frame(
 corr_matrix <- cor(data_copula_t) %>% as.data.frame()
 knitr::kable(corr_matrix, caption = "Correlation Matrix of t_copula", digits = 3)
 ```
+
+----------------------------to delete------------------------------  
 
 A t-Copula is ideal for modeling correlated medical data with heavy tails, capturing realistic dependencies between variables.  
 
@@ -125,24 +166,9 @@ ggpairs(data_copula_t,
   theme(plot.title = element_text(hjust = 0.5, face="bold", size=14))
 ```
 
-```{r interpret_corr_matrix, echo=FALSE}
-cor_data <- data.frame(
-  Variable_1 = c("Glucose", "Glucose", "Glucose", "Cholesterol", "Cholesterol", "BMI"),
-  Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", "BMI", "Blood Pressure", "Blood Pressure"),
-  Correlation = c(0.454, -0.057, -0.097, 0.048, -0.015, 0.399),
-  Interpretation = c(
-    "Moderate positive correlation → Higher glucose levels tend to be associated with higher cholesterol.",
-    "Weak negative correlation → Little to no relationship between glucose and BMI.",
-    "Weak negative correlation → Glucose and blood pressure are mostly independent.",
-    "Very weak positive correlation → Almost no association.",
-    "Nearly zero correlation → No meaningful relationship.",
-    "Moderate positive correlation → Higher BMI is linked to increased blood pressure."
-  )
-)
-knitr::kable(cor_data, caption = "Correlation Matrix Interpretation", digits = 3)
-```
 
-# 2.Implement your data generation method
+
+# 2. Implement your data generation method
 
 ```{r generate_data}
 # Function for generate multivariate t-distribution data 
@@ -167,12 +193,37 @@ generate_t_copula_data <- function(n = n, nu = nu) {
   # Generate Copula-Based Uniform Samples
   U_t <- rCopula(n, copula_t) 
 
+  # Define upper and lower bounds for each variable
+  glucose_min <- 32  # minimum plausible fasting glucose level in mg/dL
+  glucose_max <- 500 # maximum plausible fasting glucose level in mg/dL
+  
+  cholesterol_min <- 100  # minimum plausible cholesterol level in mg/dL
+  cholesterol_max <- 300  # maximum plausible cholesterol level in mg/dL
+  
+  BMI_min <- 15    # minimum plausible BMI
+  BMI_max <- 40    # maximum plausible BMI
+  
+  blood_pressure_min <- 90   # minimum plausible systolic blood pressure in mmHg
+  blood_pressure_max <- 180  # maximum plausible systolic blood pressure in mmHg
+  
   # Generate Independent Heavy-Tailed t-Distributions
-  glucose <- scale(rt(n, df=nu)) * 15 + mu[1]
-  cholesterol <- scale(rt(n, df=nu)) * 25 + mu[2]
-  BMI <- scale(rt(n, df=nu)) * 3 + mu[3]
-  blood_pressure <- scale(rt(n, df=nu)) * 10 + mu[4]
-
+  glucose_raw <- scale(rt(10000, df=nu)) * 15 + mu[1]
+  cholesterol_raw <- scale(rt(10000, df=nu)) * 25 + mu[2]
+  BMI_raw <- scale(rt(10000, df=nu)) * 3 + mu[3]
+  blood_pressure_raw <- scale(rt(10000, df=nu)) * 10 + mu[4]
+  
+  # Filter out values that fall outside the realistic human limits
+  glucose <- glucose_raw[glucose_raw >= glucose_min & 
+                           glucose_raw <= glucose_max]
+  cholesterol <- cholesterol_raw[cholesterol_raw >= cholesterol_min 
+                                 & cholesterol_raw <= cholesterol_max]
+  BMI <- BMI_raw[BMI_raw >= BMI_min & BMI_raw <= BMI_max]
+  blood_pressure <- blood_pressure_raw[blood_pressure_raw 
+                                       >= blood_pressure_min & 
+                                         blood_pressure_raw <= 
+                                         blood_pressure_max]
+  
+  
   # Map Copula Uniform Samples Back to Heavy-Tailed t-Distributions
   data_copula_t <- data.frame(
     Glucose = quantile(glucose, probs = U_t[,1]),
@@ -191,6 +242,7 @@ generated_data <- generate_t_copula_data(n = n, nu = nu)
 write.csv(generated_data, "generated_t_copula_data.csv", row.names = FALSE)
 ```
 
+
 ```{r visualization_hist_fit}
 plot_distribution <- function(data, variable_name, df=5) {
   x_min <- min(data[[variable_name]])
@@ -201,7 +253,7 @@ plot_distribution <- function(data, variable_name, df=5) {
   ggplot(data, aes(x = .data[[variable_name]])) +  
     geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "steelblue", alpha = 0.7) +  
     stat_function(fun = function(x) dt((x - mean_val) / sd_val, df = df) / sd_val, 
-                  col = "red", linewidth = .5) +  
+                  col = "red", linewidth = .8) +  
     labs(title = paste("Histogram & t-Dist Fit for", variable_name), 
          x = variable_name, y = "Density") +
     theme_minimal() + 
@@ -218,7 +270,10 @@ p4 <- plot_distribution(generated_data, "BloodPressure")
 
 This visualization compares the empirical distributions of the generated data (blue histograms) with the fitted t-distributions (red curves).  
 
-The t-distribution fits well with the generated data, particularly at the center, while slight deviations in the tails reflect expected heavy-tailed behavior. Some minor mismatches, especially in BMI and Blood Pressure, suggest potential skewness. Overall, the t-Copula effectively models correlations and heavy tails, making it a suitable choice for realistic medical data simulation.  
+The t-distribution fits well with the generated data with heavy-tailed distributions both at the center and on the tails.
+
+Overall, the t-Copula effectively models correlations and heavy tails, making it a suitable choice for realistic medical data simulation.  
+
 
 ```{r}
 # Compute the empirical correlation matrix
@@ -226,9 +281,11 @@ empirical_corr <- cor(data_copula_t)
 
 # Display side-by-side comparison
 comparison_matrix <- data.frame(
-  Variable_1 = c("Glucose", "Glucose", "Glucose", "Cholesterol", "Cholesterol", "BMI"),
-  Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", "BMI", "Blood Pressure", "Blood Pressure"),
-  Target_Correlation = c(0.5, 0, 0, 0.4, 0, 0.4),  # From defined Sigma
+  Variable_1 = c("Glucose", "Glucose", "Glucose", 
+                 "Cholesterol", "Cholesterol", "BMI"),
+  Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", 
+                 "BMI", "Blood Pressure", "Blood Pressure"),
+  Target_Correlation = c(0.5, 0, 0, 0, 0, 0.4),  # From defined Sigma
   Empirical_Correlation = c(
     empirical_corr["Glucose", "Cholesterol"],
     empirical_corr["Glucose", "BMI"],
@@ -240,6 +297,7 @@ comparison_matrix <- data.frame(
 )
 
 # Display the table
-knitr::kable(comparison_matrix, caption = "Comparison of Target vs. Empirical Correlations", digits = 3)
+knitr::kable(comparison_matrix, 
+             caption = "Comparison of Target vs. Empirical Correlations", 
+             digits = 3)
 ```
-
