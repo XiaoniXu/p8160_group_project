@@ -110,8 +110,8 @@ copula_t <- tCopula(param=rho_vec, dim=p, df=nu, dispstr="un")
 U_t <- rCopula(1000, copula_t) 
 
 # Define upper and lower bounds for each variable
-glucose_min <- 70  # minimum plausible fasting glucose level in mg/dL
-glucose_max <- 200 # maximum plausible fasting glucose level in mg/dL
+glucose_min <- 32  # minimum plausible fasting glucose level in mg/dL
+glucose_max <- 500 # maximum plausible fasting glucose level in mg/dL
 
 cholesterol_min <- 100  # minimum plausible cholesterol level in mg/dL
 cholesterol_max <- 300  # maximum plausible cholesterol level in mg/dL
@@ -128,12 +128,11 @@ cholesterol_raw <- scale(rt(10000, df=nu)) * 25 + mu[2]
 BMI_raw <- scale(rt(10000, df=nu)) * 3 + mu[3]
 blood_pressure_raw <- scale(rt(10000, df=nu)) * 10 + mu[4]
 
-# Apply the caps to ensure values are within realistic human limits
-glucose <- pmin(pmax(glucose_raw, glucose_min), glucose_max)
-cholesterol <- pmin(pmax(cholesterol_raw, cholesterol_min), cholesterol_max)
-BMI <- pmin(pmax(BMI_raw, BMI_min), BMI_max)
-blood_pressure <- pmin(pmax(blood_pressure_raw, blood_pressure_min), blood_pressure_max)
-
+# Filter out values that fall outside the realistic human limits
+glucose <- glucose_raw[glucose_raw >= glucose_min & glucose_raw <= glucose_max]
+cholesterol <- cholesterol_raw[cholesterol_raw >= cholesterol_min & cholesterol_raw <= cholesterol_max]
+BMI <- BMI_raw[BMI_raw >= BMI_min & BMI_raw <= BMI_max]
+blood_pressure <- blood_pressure_raw[blood_pressure_raw >= blood_pressure_min & blood_pressure_raw <= blood_pressure_max]
 
 
 # Map Copula Uniform Samples Back to Heavy-Tailed t-Distributions
@@ -167,22 +166,7 @@ ggpairs(data_copula_t,
   theme(plot.title = element_text(hjust = 0.5, face="bold", size=14))
 ```
 
-```{r interpret_corr_matrix, echo=FALSE}
-cor_data <- data.frame(
-  Variable_1 = c("Glucose", "Glucose", "Glucose", "Cholesterol", "Cholesterol", "BMI"),
-  Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", "BMI", "Blood Pressure", "Blood Pressure"),
-  Correlation = c(0.454, -0.057, -0.097, 0.048, -0.015, 0.399),
-  Interpretation = c(
-    "Moderate positive correlation → Higher glucose levels tend to be associated with higher cholesterol.",
-    "Weak negative correlation → Little to no relationship between glucose and BMI.",
-    "Weak negative correlation → Glucose and blood pressure are mostly independent.",
-    "Very weak positive correlation → Almost no association.",
-    "Nearly zero correlation → No meaningful relationship.",
-    "Moderate positive correlation → Higher BMI is linked to increased blood pressure."
-  )
-)
-knitr::kable(cor_data, caption = "Correlation Matrix Interpretation", digits = 3)
-```
+
 
 # 2. Implement your data generation method
 
@@ -209,12 +193,37 @@ generate_t_copula_data <- function(n = n, nu = nu) {
   # Generate Copula-Based Uniform Samples
   U_t <- rCopula(n, copula_t) 
 
+  # Define upper and lower bounds for each variable
+  glucose_min <- 32  # minimum plausible fasting glucose level in mg/dL
+  glucose_max <- 500 # maximum plausible fasting glucose level in mg/dL
+  
+  cholesterol_min <- 100  # minimum plausible cholesterol level in mg/dL
+  cholesterol_max <- 300  # maximum plausible cholesterol level in mg/dL
+  
+  BMI_min <- 15    # minimum plausible BMI
+  BMI_max <- 40    # maximum plausible BMI
+  
+  blood_pressure_min <- 90   # minimum plausible systolic blood pressure in mmHg
+  blood_pressure_max <- 180  # maximum plausible systolic blood pressure in mmHg
+  
   # Generate Independent Heavy-Tailed t-Distributions
-  glucose <- scale(rt(n, df=nu)) * 15 + mu[1]
-  cholesterol <- scale(rt(n, df=nu)) * 25 + mu[2]
-  BMI <- scale(rt(n, df=nu)) * 3 + mu[3]
-  blood_pressure <- scale(rt(n, df=nu)) * 10 + mu[4]
-
+  glucose_raw <- scale(rt(10000, df=nu)) * 15 + mu[1]
+  cholesterol_raw <- scale(rt(10000, df=nu)) * 25 + mu[2]
+  BMI_raw <- scale(rt(10000, df=nu)) * 3 + mu[3]
+  blood_pressure_raw <- scale(rt(10000, df=nu)) * 10 + mu[4]
+  
+  # Filter out values that fall outside the realistic human limits
+  glucose <- glucose_raw[glucose_raw >= glucose_min & 
+                           glucose_raw <= glucose_max]
+  cholesterol <- cholesterol_raw[cholesterol_raw >= cholesterol_min 
+                                 & cholesterol_raw <= cholesterol_max]
+  BMI <- BMI_raw[BMI_raw >= BMI_min & BMI_raw <= BMI_max]
+  blood_pressure <- blood_pressure_raw[blood_pressure_raw 
+                                       >= blood_pressure_min & 
+                                         blood_pressure_raw <= 
+                                         blood_pressure_max]
+  
+  
   # Map Copula Uniform Samples Back to Heavy-Tailed t-Distributions
   data_copula_t <- data.frame(
     Glucose = quantile(glucose, probs = U_t[,1]),
@@ -244,7 +253,7 @@ plot_distribution <- function(data, variable_name, df=5) {
   ggplot(data, aes(x = .data[[variable_name]])) +  
     geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "steelblue", alpha = 0.7) +  
     stat_function(fun = function(x) dt((x - mean_val) / sd_val, df = df) / sd_val, 
-                  col = "red", linewidth = .5) +  
+                  col = "red", linewidth = .8) +  
     labs(title = paste("Histogram & t-Dist Fit for", variable_name), 
          x = variable_name, y = "Density") +
     theme_minimal() + 
@@ -261,7 +270,9 @@ p4 <- plot_distribution(generated_data, "BloodPressure")
 
 This visualization compares the empirical distributions of the generated data (blue histograms) with the fitted t-distributions (red curves).  
 
-The t-distribution fits well with the generated data, particularly at the center, while slight deviations in the tails reflect expected heavy-tailed behavior. Some minor mismatches, especially in BMI and Blood Pressure, suggest potential skewness. Overall, the t-Copula effectively models correlations and heavy tails, making it a suitable choice for realistic medical data simulation.  
+The t-distribution fits well with the generated data with heavy-tailed distributions both at the center and on the tails.
+
+Overall, the t-Copula effectively models correlations and heavy tails, making it a suitable choice for realistic medical data simulation.  
 
 
 ```{r}
@@ -274,7 +285,7 @@ comparison_matrix <- data.frame(
                  "Cholesterol", "Cholesterol", "BMI"),
   Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", 
                  "BMI", "Blood Pressure", "Blood Pressure"),
-  Target_Correlation = c(0.5, 0, 0, 0.4, 0, 0.4),  # From defined Sigma
+  Target_Correlation = c(0.5, 0, 0, 0, 0, 0.4),  # From defined Sigma
   Empirical_Correlation = c(
     empirical_corr["Glucose", "Cholesterol"],
     empirical_corr["Glucose", "BMI"],
