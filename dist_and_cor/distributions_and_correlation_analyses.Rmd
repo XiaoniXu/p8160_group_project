@@ -1,26 +1,28 @@
 ---
-title: "distributions_and_correlation_analyses"
+title: "Project 1: Multivariate Non-Normal Distributions and Correlated Data"
 output: html_document
 ---
 
-# 1.Plan and specify distributions and correlation
+# 1. Plan and specify distributions and correlation
 
-The purpose of this code is to simulate medical data with heavy-tailed characteristics using a t-Copula to generate correlated variables (such as Glucose, Cholesterol, BMI, and Blood Pressure).  
+We simulate medical data with heavy-tailed a Multivariate t-Distribution using a t-Copula to generate correlated variables: Glucose, Cholesterol, BMI, and Blood Pressure).  
 
-We model the data using a **Multivariate t-Distribution** and apply a t-Copula to introduce correlations, ensuring that the generated dataset aligns with the statistical properties of real-world medical data.  
 
-```{r set_parameters, message=FALSE, warning=FALSE}
+```{r load_packages, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(MASS)  
 library(Matrix)
 library(copula)
-library(mvtnorm)   # For multivariate t-distribution
+library(mvtnorm)
 library(ggplot2) 
 library(GGally)
 library(DT)
 library(patchwork)
+```
 
-set.seed(123)
+
+```{r set_parameters, message=FALSE}
+set.seed(2025)
 
 # Define parameters
 nu <- 5  # Degrees of freedom (controls tail thickness)
@@ -34,24 +36,23 @@ mu <- c(100,   # Mean Glucose Level (mg/dL)
         120)   # Mean Blood Pressure (mmHg)
 ```
 
-1. Degrees of Freedom *(nu = 5)*
+- Degrees of Freedom (nu = 5)
+
 A lower degrees of freedom (e.g., 5) results in a heavier tail, which better simulates extreme cases in medical data, such as patients with diabetes or obesity.  
-Higher degrees of freedom make the data closer to a normal distribution, but medical data is often non-normal, making the t-distribution a better fit.  
 
-2. Number of Variables *(p = 4)*  
-These four variables (Glucose, Cholesterol, BMI, Blood Pressure) are commonly used metabolic and cardiovascular health indicators.  
-In real-world data, these variables often exhibit correlations, making them suitable for a correlation-based simulation.  
 
-3. Choice of Mean Values *(mu)*  
-The mean values are set based on realistic medical data:  
-*Glucose:* Typically ranges from 70-140 mg/dL, so setting the mean to 100 mg/dL is reasonable.  
-*Cholesterol:* A normal range is 150-250 mg/dL, making 200 mg/dL a suitable average.  
-*BMI:* Normal BMI falls between 18-30, so 25 is a standard mean.  
-*Blood Pressure:* Healthy blood pressure ranges from 90-140 mmHg, making 120 mmHg an appropriate mean.  
+- Number of Variables (p = 4)
+
+These four variables (Glucose, Cholesterol, BMI, Blood Pressure) are commonly used metabolic and cardiovascular health indicators and are correlated to each other.
+
+- Choice of Mean Values (mu)  
+The mean values are set based on typical values of a healthy adult.
+
 
 ```{r corr_structure}
 # Define block structures
 # Block-diagonal: high correlation within groups, no correlation across groups
+
 # Glucose & Cholesterol (Metabolism)
 block1 <- matrix(c(1, 0.5, 
                    0.5, 1), nrow=2, ncol=2) 
@@ -67,8 +68,8 @@ Sigma <- bdiag(block1, block2)
 Sigma <- as.matrix(nearPD(Sigma)$mat) 
 ```
 
-A **block-diagonal correlation structure** is chosen to reflect real-world physiological relationships in medical data, ensuring that highly related variables are grouped together while unrelated ones remain independent.  
 
+----------------------------to delete------------------------------
 Medical Justification for Grouping Variables:  
 
 1. Glucose & Cholesterol (Metabolic Block)  
@@ -109,6 +110,8 @@ corr_matrix <- cor(data_copula_t) %>% as.data.frame()
 knitr::kable(corr_matrix, caption = "Correlation Matrix of t_copula", digits = 3)
 ```
 
+----------------------------to delete------------------------------
+
 A t-Copula is ideal for modeling correlated medical data with heavy tails, capturing realistic dependencies between variables.  
 
 Medical variables (glucose, cholesterol, BMI, blood pressure) often show heavy-tailed distributions.  
@@ -142,7 +145,7 @@ cor_data <- data.frame(
 knitr::kable(cor_data, caption = "Correlation Matrix Interpretation", digits = 3)
 ```
 
-# 2.Implement your data generation method
+# 2. Implement your data generation method
 
 ```{r generate_data}
 # Function for generate multivariate t-distribution data 
@@ -191,6 +194,7 @@ generated_data <- generate_t_copula_data(n = n, nu = nu)
 write.csv(generated_data, "generated_t_copula_data.csv", row.names = FALSE)
 ```
 
+
 ```{r visualization_hist_fit}
 plot_distribution <- function(data, variable_name, df=5) {
   x_min <- min(data[[variable_name]])
@@ -220,14 +224,17 @@ This visualization compares the empirical distributions of the generated data (b
 
 The t-distribution fits well with the generated data, particularly at the center, while slight deviations in the tails reflect expected heavy-tailed behavior. Some minor mismatches, especially in BMI and Blood Pressure, suggest potential skewness. Overall, the t-Copula effectively models correlations and heavy tails, making it a suitable choice for realistic medical data simulation.  
 
+
 ```{r}
 # Compute the empirical correlation matrix
 empirical_corr <- cor(data_copula_t)
 
 # Display side-by-side comparison
 comparison_matrix <- data.frame(
-  Variable_1 = c("Glucose", "Glucose", "Glucose", "Cholesterol", "Cholesterol", "BMI"),
-  Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", "BMI", "Blood Pressure", "Blood Pressure"),
+  Variable_1 = c("Glucose", "Glucose", "Glucose", 
+                 "Cholesterol", "Cholesterol", "BMI"),
+  Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", 
+                 "BMI", "Blood Pressure", "Blood Pressure"),
   Target_Correlation = c(0.5, 0, 0, 0.4, 0, 0.4),  # From defined Sigma
   Empirical_Correlation = c(
     empirical_corr["Glucose", "Cholesterol"],
@@ -240,6 +247,8 @@ comparison_matrix <- data.frame(
 )
 
 # Display the table
-knitr::kable(comparison_matrix, caption = "Comparison of Target vs. Empirical Correlations", digits = 3)
+knitr::kable(comparison_matrix, 
+             caption = "Comparison of Target vs. Empirical Correlations", 
+             digits = 3)
 ```
 
