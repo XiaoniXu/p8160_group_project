@@ -422,5 +422,8 @@ ggplot(data=testing_plot1, aes(x = as.numeric(samp_size), y = beta)) +
 ```
 
 
+* Some additional thoughts:
+  * Should I be doing more than one realization of, for ex, n = 1000? that would add another layer of uncertainty... *but* that would mean that we could characterize, for ex, the % of the time that the CI covers the true value [for each n] -- *I think that actually is the way to go*
+  * need to get theoretical regression coefficients in order to compare these CIs
 
 
