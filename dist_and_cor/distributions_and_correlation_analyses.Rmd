@@ -25,7 +25,7 @@ library(patchwork)
 set.seed(2025)
 
 # Define parameters
-nu <- 5  # Degrees of freedom (controls tail thickness)
+nu <- 3  # Degrees of freedom (controls tail thickness)
 p <- 4   # Number of variables
 n <- 1000  # Number of samples
 
@@ -109,12 +109,32 @@ copula_t <- tCopula(param=rho_vec, dim=p, df=nu, dispstr="un")
 # Generate Copula-Based Uniform Samples
 U_t <- rCopula(1000, copula_t) 
 
+# Define upper and lower bounds for each variable
+glucose_min <- 70  # minimum plausible fasting glucose level in mg/dL
+glucose_max <- 200 # maximum plausible fasting glucose level in mg/dL
+
+cholesterol_min <- 100  # minimum plausible cholesterol level in mg/dL
+cholesterol_max <- 300  # maximum plausible cholesterol level in mg/dL
+
+BMI_min <- 15    # minimum plausible BMI
+BMI_max <- 40    # maximum plausible BMI
+
+blood_pressure_min <- 90   # minimum plausible systolic blood pressure in mmHg
+blood_pressure_max <- 180  # maximum plausible systolic blood pressure in mmHg
+
 # Generate Independent Heavy-Tailed t-Distributions
-# Use scale() to avoid the variance might be too high for a realistic medical dataset
-glucose <- scale(rt(1000, df=nu)) * 15 + mu[1]
-cholesterol <- scale(rt(1000, df=nu)) * 25 + mu[2]
-BMI <- scale(rt(1000, df=nu)) * 3 + mu[3]
-blood_pressure <- scale(rt(1000, df=nu)) * 10 + mu[4]
+glucose_raw <- scale(rt(10000, df=nu)) * 15 + mu[1]
+cholesterol_raw <- scale(rt(10000, df=nu)) * 25 + mu[2]
+BMI_raw <- scale(rt(10000, df=nu)) * 3 + mu[3]
+blood_pressure_raw <- scale(rt(10000, df=nu)) * 10 + mu[4]
+
+# Apply the caps to ensure values are within realistic human limits
+glucose <- pmin(pmax(glucose_raw, glucose_min), glucose_max)
+cholesterol <- pmin(pmax(cholesterol_raw, cholesterol_min), cholesterol_max)
+BMI <- pmin(pmax(BMI_raw, BMI_min), BMI_max)
+blood_pressure <- pmin(pmax(blood_pressure_raw, blood_pressure_min), blood_pressure_max)
+
+
 
 # Map Copula Uniform Samples Back to Heavy-Tailed t-Distributions
 data_copula_t <- data.frame(
