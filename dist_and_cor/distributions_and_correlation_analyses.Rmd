@@ -413,12 +413,36 @@ ggplot(data=testing_plot1, aes(x = as.numeric(samp_size), y = beta)) +
 ```
 
 
-```{r simstudy1_2}
-# 3.2.2 Vary degree of non-normality
+```{r simstudy1_2_samples}
+# Multiple iterations for each sample size -- i.e. what ~percent~ of the CIs included the true value, etc. (build this out into a table)
 
-# it says "or" -- is it supposed to be "and", i.e. check all of these things?
-# coding it would be super simple once the structure above^^ is formalized
+# function which 1. generates data for a given sample size, 2. generates the linear regression, then 3. characterizes a) the mean beta estimated across those iterations for that sample size and b) the percentage of confidence intervals which covered the true value
 
+confidence_coverage <- function(num_iterations){
+  list_iterations <- list()
+  for (iterations in seq(1,num_iterations)){
+        for (ii in sampsize_3_2){
+          generated_data_loop <- generate_t_copula_data(n = ii, nu = df_3_2)
+          lm_varysampsize_store[[paste0("sampsize", ii)]] <- c(pairwise_linreg_storebeta(generated_data_loop, samp_size = ii))
+        }
+        
+        # collapse & plot all
+        one_sampsize <- as.data.frame(t(as.data.frame((c(lm_varysampsize_store))))) # 120 obs-nice
+        rownames(one_sampsize) <- seq(1,nrow(one_sampsize))
+        colnames(one_sampsize)[3] <- "beta"
+        one_sampsize$beta <- as.numeric(one_sampsize$beta)
+        one_sampsize$upper <- as.numeric(one_sampsize$upper)
+        one_sampsize$lower <- as.numeric(one_sampsize$lower)
+        
+        # save output into list
+        list_iterations[[iterations]] <- one_sampsize
+        return(list_iterations)
+  }
+  
+}
+
+output_3_2 <- confidence_coverage(10) # somehthing is wrong here, i should be getting a list of list of lists lol FIX IT
+# then the issue will just be compressing them to get the summary stats, but that's not SO complicated
 ```
 
 
