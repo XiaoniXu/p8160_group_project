@@ -9,22 +9,35 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Design a simulation study 2
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+Identify a statistical inference tool that could accommodate the correlation and non-normality ((e.g., a robust regression approach, generalized estimating equations (GEE) for correlated data, or a Bayesian method with appropriate priors).
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+Use simulation that is similar to Simulation 1 to this inference tool provides valid results for non-normal, correlated data, and compare these results to the standard inference tool in study 1.
+```{r}
+library(tidyverse)
+library(ggplot2)  
+library(geepack)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+#load simulated data
+generated_data = read_csv("./generated_t_copula_data.csv") %>% janitor::clean_names()
+  
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+#using Gee
+library(geepack)
+
+# Example: Modeling glucose as a function of BMI and cholesterol
+gee_model <- geeglm(glucose ~ bmi + cholesterol+blood_pressure, 
+                     data = generated_data, 
+                     family = gaussian, 
+                     id = patient_id, 
+                     corstr = "exchangeable")
+
+summary(gee_model)
+
+```
+
