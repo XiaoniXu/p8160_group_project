@@ -3,6 +3,8 @@ title: "Project 1: Multivariate Non-Normal Distributions and Correlated Data"
 output: html_document
 ---
 
+# Hello this is the report for the project 1
+
 # 1. Plan and specify distributions and correlation
 
 We simulate medical data with heavy-tailed a Multivariate t-Distribution using a t-Copula to generate correlated variables: Glucose, Cholesterol, BMI, and Blood Pressure).  
@@ -60,6 +62,7 @@ block1 <- matrix(c(1, 0.5,
 block2 <- matrix(c(1, 0.4, 
                    0.4, 1), nrow=2, ncol=2)  
 
+
 # Combine blocks into a block-diagonal matrix
 Sigma <- bdiag(block1, block2)
 
@@ -88,11 +91,7 @@ Idea behind copulas:
 
 - Tail dependence is when the correlation between two variables increases as you get "further" in the tail (either or both) of the distribution. Gaussian copula has no tail dependence.
 
-<<<<<<< HEAD
-----------------------------to delete------------------------------  
-=======
-----------------------------to delete------------------------------
->>>>>>> 44fb48bc34e045e0266b243015df6502e256583d
+
 Medical Justification for Grouping Variables:  
 
 1. Glucose & Cholesterol (Metabolic Block)  
@@ -152,11 +151,6 @@ corr_matrix <- cor(data_copula_t) %>% as.data.frame()
 knitr::kable(corr_matrix, caption = "Correlation Matrix of t_copula", digits = 3)
 ```
 
-<<<<<<< HEAD
-----------------------------to delete------------------------------  
-=======
-----------------------------to delete------------------------------
->>>>>>> 44fb48bc34e045e0266b243015df6502e256583d
 
 A t-Copula is ideal for modeling correlated medical data with heavy tails, capturing realistic dependencies between variables.  
 
@@ -293,7 +287,7 @@ comparison_matrix <- data.frame(
                  "Cholesterol", "Cholesterol", "BMI"),
   Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", 
                  "BMI", "Blood Pressure", "Blood Pressure"),
-  Target_Correlation = c(0.5, 0, 0, 0, 0, 0.4),  # From defined Sigma
+  Target_Correlation = c(0.5, 0.2, 0.1, 0.1, 0.2, 0.4),  # From defined Sigma
   Empirical_Correlation = c(
     empirical_corr["Glucose", "Cholesterol"],
     empirical_corr["Glucose", "BMI"],
@@ -308,9 +302,6 @@ comparison_matrix <- data.frame(
 knitr::kable(comparison_matrix, 
              caption = "Comparison of Target vs. Empirical Correlations", 
              digits = 3)
-<<<<<<< HEAD
-```
-=======
+
 ```
 
->>>>>>> 44fb48bc34e045e0266b243015df6502e256583d

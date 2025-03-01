@@ -354,6 +354,9 @@ Distributions and Correlated Data</h1>
 </div>
 
 
+<div id="hello-this-is-the-report-for-the-project-1" class="section level1">
+<h1>Hello this is the report for the project 1</h1>
+</div>
 <div id="plan-and-specify-distributions-and-correlation" class="section level1">
 <h1>1. Plan and specify distributions and correlation</h1>
 <p>We simulate medical data with heavy-tailed a Multivariate
@@ -405,6 +408,7 @@ block1 &lt;- matrix(c(1, 0.5,
 block2 &lt;- matrix(c(1, 0.4, 
                    0.4, 1), nrow=2, ncol=2)  
 
+
 # Combine blocks into a block-diagonal matrix
 Sigma &lt;- bdiag(block1, block2)
 
@@ -449,13 +453,7 @@ dependence)</p></li>
 increases as you get “further” in the tail (either or both) of the
 distribution. Gaussian copula has no tail dependence.</p></li>
 </ul>
-<<<<<<< HEAD
-<p>—————————-to delete——————————<br />
-Medical Justification for Grouping Variables:</p>
-=======
-<p>—————————-to delete—————————— Medical Justification for Grouping
-Variables:</p>
->>>>>>> 44fb48bc34e045e0266b243015df6502e256583d
+<p>Medical Justification for Grouping Variables:</p>
 <ol style="list-style-type: decimal">
 <li><p>Glucose &amp; Cholesterol (Metabolic Block)<br />
 These two variables are often correlated because they are both regulated
@@ -556,7 +554,6 @@ knitr::kable(corr_matrix, caption = &quot;Correlation Matrix of t_copula&quot;, 
 </tr>
 </tbody>
 </table>
-<p>—————————-to delete——————————</p>
 <p>A t-Copula is ideal for modeling correlated medical data with heavy
 tails, capturing realistic dependencies between variables.</p>
 <p>Medical variables (glucose, cholesterol, BMI, blood pressure) often
@@ -685,7 +682,7 @@ comparison_matrix &lt;- data.frame(
                  &quot;Cholesterol&quot;, &quot;Cholesterol&quot;, &quot;BMI&quot;),
   Variable_2 = c(&quot;Cholesterol&quot;, &quot;BMI&quot;, &quot;Blood Pressure&quot;, 
                  &quot;BMI&quot;, &quot;Blood Pressure&quot;, &quot;Blood Pressure&quot;),
-  Target_Correlation = c(0.5, 0, 0, 0, 0, 0.4),  # From defined Sigma
+  Target_Correlation = c(0.5, 0.2, 0.1, 0.1, 0.2, 0.4),  # From defined Sigma
   Empirical_Correlation = c(
     empirical_corr[&quot;Glucose&quot;, &quot;Cholesterol&quot;],
     empirical_corr[&quot;Glucose&quot;, &quot;BMI&quot;],
@@ -726,25 +723,25 @@ knitr::kable(comparison_matrix,
 <tr class="even">
 <td align="left">Glucose</td>
 <td align="left">BMI</td>
-<td align="right">0.0</td>
+<td align="right">0.2</td>
 <td align="right">0.020</td>
 </tr>
 <tr class="odd">
 <td align="left">Glucose</td>
 <td align="left">Blood Pressure</td>
-<td align="right">0.0</td>
+<td align="right">0.1</td>
 <td align="right">-0.024</td>
 </tr>
 <tr class="even">
 <td align="left">Cholesterol</td>
 <td align="left">BMI</td>
-<td align="right">0.0</td>
+<td align="right">0.1</td>
 <td align="right">0.001</td>
 </tr>
 <tr class="odd">
 <td align="left">Cholesterol</td>
 <td align="left">Blood Pressure</td>
-<td align="right">0.0</td>
+<td align="right">0.2</td>
 <td align="right">0.015</td>
 </tr>
 <tr class="even">
