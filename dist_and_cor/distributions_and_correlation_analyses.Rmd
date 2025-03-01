@@ -20,6 +20,7 @@ library(ggplot2)
 library(GGally)
 library(DT)
 library(patchwork)
+library(kableExtra)
 ```
 
 
@@ -577,7 +578,7 @@ set.seed(445578)
 
 ```{r}
 # read in csv
-simstudy1_1000sim <- read.csv(here("./simstudy_1/simstudy1_1000sim_1.csv"))
+simstudy1_1000sim_1 <- read.csv(here("./simstudy_1/simstudy1_1000sim_1.csv"))
 
 # create confidence interval coverage statistics
 library(dplyr)
@@ -632,3 +633,280 @@ ggplot(data=simstudy1_1000sim_1_typeone, aes(x = tdist_df, y = in_CI_pct)) +
 
 ```
 
+## Design Simulation study 2
+
+Identify a statistical inference tool that could accommodate the correlation and non-normality ((e.g., a robust regression approach, generalized estimating equations (GEE) for correlated data, or a Bayesian method with appropriate priors).
+
+Use simulation that is similar to Simulation 1 to this inference tool provides valid results for non-normal, correlated data, and compare these results to the standard inference tool in study 1.
+
+For this simulation, robust regression was used to mitigate the influence of outliers and heavy-tailed distributions. It is useful when ordinary least squares assumptions don't hold up Specifically, MM-estimation was performed because this method is useful when handeling correlated and non-normal data. The model works by using two steps. The first step is an initial robust estimation with $\beta$ of high resistance to outliers, and the second step involves refining the estimate using a robust lost function. This form of regression downweigns the influence of outliers and works well with skewed data. MM-estimation robust regressing has a high breakdown point compared to other regression models, meaning a high fraction of outliers for which a model won't break down.
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(robustbase)
+library(copula)
+library(Matrix)
+```
+
+```{r}
+#taken from parts 1 and 2 and turned into a function so I can change parapeters in the simulation
+
+#function to generate correlated non-normal data using a t-Copula (used part 2)
+generate_t_copula_data <- function(n, nu, rho_mod = NULL) {
+  #block-diagonal correlation structure
+  block1 <- matrix(c(1, 0.5, 0.5, 1), 2, 2)  #metabolic block
+  block2 <- matrix(c(1, 0.4, 0.4, 1), 2, 2)  #cardiovascular block
+  
+  #modify correlation for later
+  if (!is.null(rho_mod)) {
+    block1[1,2] <- block1[2,1] <- rho_mod[1]
+    block2[1,2] <- block2[2,1] <- rho_mod[2]
+  }
+  
+  #correlation matrix
+  Sigma <- bdiag(block1, block2)
+  Sigma <- as.matrix(nearPD(Sigma)$mat)
+  rho_vec <- Sigma[lower.tri(Sigma)]  
+  
+  #define the t-Copula
+  copula_t <- tCopula(param=rho_vec, dim=4, df=nu, dispstr="un")
+  U_t <- rCopula(n, copula_t)  
+  
+  #generate independent heavy-tailed distributions
+  mu <- c(100, 200, 25, 120) #the means
+  
+# Define upper and lower bounds for each variable
+glucose_min <- 32  # minimum plausible fasting glucose level in mg/dL
+glucose_max <- 500 # maximum plausible fasting glucose level in mg/dL
+
+cholesterol_min <- 100  # minimum plausible cholesterol level in mg/dL
+cholesterol_max <- 300  # maximum plausible cholesterol level in mg/dL
+
+BMI_min <- 15    # minimum plausible BMI
+BMI_max <- 40    # maximum plausible BMI
+
+blood_pressure_min <- 90   # minimum plausible systolic blood pressure in mmHg
+blood_pressure_max <- 180  # maximum plausible systolic blood pressure in mmHg
+
+  glucose_raw <- scale(rt(10000, df=nu)) * 15 + mu[1]
+  cholesterol_raw <- scale(rt(10000, df=nu)) * 25 + mu[2]
+  bmi_raw <- scale(rt(10000, df=nu)) * 3 + mu[3]
+  blood_pressure_raw <- scale(rt(10000, df=nu)) * 10 + mu[4]
+  
+  # Filter out values that fall outside the realistic human limits
+glucose <- glucose_raw[glucose_raw >= glucose_min & glucose_raw <= glucose_max]
+cholesterol <- cholesterol_raw[cholesterol_raw >= cholesterol_min & cholesterol_raw <= cholesterol_max]
+bmi <- bmi_raw[bmi_raw >= BMI_min & bmi_raw <= BMI_max]
+blood_pressure <- blood_pressure_raw[blood_pressure_raw >= blood_pressure_min & blood_pressure_raw <= blood_pressure_max]
+
+  #map Copula Uniform Samples Back to Heavy-Tailed Distributions
+  data_copula_t <- data.frame(
+    glucose = quantile(glucose, probs = U_t[,1]),
+    cholesterol = quantile(cholesterol, probs = U_t[,2]),
+    bmi = quantile(bmi, probs = U_t[,3]),
+    blood_pressure = quantile(blood_pressure, probs = U_t[,4])
+  )
+  return(data_copula_t)
+}
+
+```
+$$
+\hat{\beta} = \arg\min_{\beta} \sum_{i=1}^{n} \rho \left( \frac{y_i - x_i^\top \beta}{\hat{\sigma}} \right)
+$$
+$y_i$ : dependent variable
+$x_i$ : predictor variable
+$\beta$ : regression coefficients
+$\sigma$ : robust estimate of residual standard deviation
+$\rho$: Robust loss function
+
+Original Data & Robust Regression
+```{r}
+set.seed(2025)
+
+original_data <- generate_t_copula_data(n = 100, nu = 5)
+original_data <- original_data %>%
+  mutate(across(everything(), ~ . - mean(.)))#centering the data. this prevents the intercept variance from over affecting the data 
+original_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = original_data)
+summary(original_model) #robust regression using MM
+```
+Larger Sample Size
+
+```{r}
+set.seed(2025)
+
+large_data <- generate_t_copula_data(n = 500, nu = 5)
+large_data <- large_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+large_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = large_data)
+summary(large_model)
+```
+Varying Correlation Levels
+
+```{r}
+set.seed(2025)
+high_corr_data <- generate_t_copula_data(n = 100, nu = 5, rho_mod = c(0.8, 0.7))
+high_corr_data <- high_corr_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+high_corr_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = high_corr_data)
+summary(high_corr_model)
+
+low_corr_data <- generate_t_copula_data(n = 100, nu = 5, rho_mod = c(0.2, 0.1))
+low_corr_data <- low_corr_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+low_corr_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = low_corr_data)
+summary(low_corr_model)
+```
+
+Varying Non-Normality Degree
+```{r}
+low_df_data <- generate_t_copula_data(n = 100, nu = 4)
+low_df_data <-low_df_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+low_df_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = low_df_data)
+summary(low_df_model)
+
+high_df_data <- generate_t_copula_data(n = 100, nu = 6)
+high_df_data <- high_df_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+high_df_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = high_df_data)
+summary(high_df_model)
+
+```
+Lower than 4, and the data did not converge
+```{r}
+set.seed(2025)
+bmi_data <- generate_t_copula_data(n = 100, nu = 5)
+
+# Add a strong linear effect of bmi on glucose
+bmi_data$glucose <- bmi_data$glucose + 2 * bmi_data$bmi  # Adjust the coefficient (0.5) as needed
+
+#center
+bmi_data <- bmi_data %>% mutate(across(everything(), ~ . - mean(.)))
+
+#robust regression model
+bmi_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = bmi_data)
+summary(bmi_model)
+```
+
+Visualizing results
+
+```{r}
+
+true_mean_glucose <- 0 #because data was centered around 0
+
+#variance
+calculate_variance <- function(model) {
+  return(diag(vcov(model)))
+}
+
+#bias for glucose 
+calculate_bias_glucose <- function(model, true_mean_glucose, data) {
+  predicted_mean_glucose <- predict(model, newdata = data.frame(
+    cholesterol = 0,  # all centered
+    bmi = 0,          
+    blood_pressure = 0
+  ))
+  
+  #bias = predicted mean - true mean
+  bias <- predicted_mean_glucose - true_mean_glucose
+  return(bias)
+}
+
+#store results
+store_results <- function(model, scenario_name, true_mean_glucose, data) {
+  variance <- calculate_variance(model)
+  bias <- calculate_bias_glucose(model, true_mean_glucose, data)
+  
+  data.frame(
+    Scenario = scenario_name,
+    Variance_Intercept = variance[1],
+    Variance_BloodPressure = variance[2],
+    Variance_Cholesterol = variance[3],
+    Variance_BMI = variance[4],
+    Bias_Glucose = bias
+  )
+}
+
+#store results for each scenario
+results <- rbind(
+  store_results(original_model, "Original Data", true_mean_glucose, original_data),
+  store_results(large_model, "Larger Sample Size", true_mean_glucose, large_data),
+  store_results(high_corr_model, "High Correlation Levels", true_mean_glucose, high_corr_data),
+  store_results(low_corr_model, "Low Correlation Levels", true_mean_glucose, low_corr_data),
+  store_results(high_df_model, "High df (Less Non-Normal)", true_mean_glucose, high_df_data),
+  store_results(low_df_model, "Low df (More Non-Normal)", true_mean_glucose, low_df_data),
+  store_results(bmi_model, "BMI Effect Model", true_mean_glucose, bmi_data)
+)
+
+#results table
+kable(results, caption = "Comparison of Variance and Bias Across Different Scenarios")
+```
+
+
+```{r}
+#variance (for coefficients)
+variance_long <- results %>%
+  pivot_longer(cols = starts_with("Variance"), 
+               names_to = "Coefficient", 
+               values_to = "Variance")
+
+ggplot(variance_long, aes(x = Scenario, y = Variance, fill = Coefficient)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Variance of Coefficients", x = "Scenario", y = "Variance") +
+  theme_minimal()
+```
+
+
+```{r}
+#bias (for glucose)
+ggplot(results, aes(x = Scenario, y = Bias_Glucose, fill = Scenario)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Bias of Glucose Predictions", x = "Scenario", y = "Bias") +
+  theme_minimal()
+```
+
+```{r}
+library(dplyr)
+library(knitr)
+
+# Function to extract R^2 and significant predictors
+extract_results <- function(model, scenario_name) {
+  # Extract R^2
+  r_squared <- summary(model)$r.squared
+  
+  # Extract coefficients and p-values
+  coef_table <- summary(model)$coefficients
+  significant_predictors <- rownames(coef_table)[coef_table[, "Pr(>|t|)"] < 0.05]
+  
+  # Remove intercept from significant predictors
+  significant_predictors <- significant_predictors[significant_predictors != "(Intercept)"]
+  
+  # Combine into a data frame
+  data.frame(
+    Scenario = scenario_name,
+    R_Squared = r_squared,
+    Significant_Predictors = paste(significant_predictors, collapse = ", ")
+  )
+}
+
+results_table <- rbind(
+  extract_results(original_model, "Original Data"),
+  extract_results(large_model, "Larger Sample Size"),
+  extract_results(high_corr_model, "High Correlation Levels"),
+  extract_results(low_corr_model, "Low Correlation Levels"),
+  extract_results(high_df_model, "High df (Less Non-Normal)"),
+  extract_results(low_df_model, "Low df (More Non-Normal)"),
+  extract_results(bmi_model, "BMI Effect")
+)
+
+
+kable(results_table, caption = "Model Performance and Significant Predictors")
+```
+
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
+
+## Refrences
+
+http://dx.doi.org/10.12732/ijpam.v91i3.7

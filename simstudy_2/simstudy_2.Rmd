@@ -15,7 +15,7 @@ Identify a statistical inference tool that could accommodate the correlation and
 
 Use simulation that is similar to Simulation 1 to this inference tool provides valid results for non-normal, correlated data, and compare these results to the standard inference tool in study 1.
 
-For this simulation, robust regression was used to mitigate the influence of outliers and heavy-tailed distributions. Specifically, MM-estimation was performed because this method is useful when handeling correlated and non-normal data. 
+For this simulation, robust regression was used to mitigate the influence of outliers and heavy-tailed distributions. It is useful when ordinary least squares assumptions don't hold up Specifically, MM-estimation was performed because this method is useful when handeling correlated and non-normal data. The model works by using two steps. The first step is an initial robust estimation with $\beta$ of high resistance to outliers, and the second step involves refining the estimate using a robust lost function. This form of regression downweigns the influence of outliers and works well with skewed data. MM-estimation robust regressing has a high breakdown point compared to other regression models, meaning a high fraction of outliers for which a model won't break down.
 ```{r}
 library(tidyverse)
 library(ggplot2)
@@ -86,6 +86,14 @@ blood_pressure <- blood_pressure_raw[blood_pressure_raw >= blood_pressure_min & 
 }
 
 ```
+$$
+\hat{\beta} = \arg\min_{\beta} \sum_{i=1}^{n} \rho \left( \frac{y_i - x_i^\top \beta}{\hat{\sigma}} \right)
+$$
+$y_i$ : dependent variable
+$x_i$ : predictor variable
+$\beta$ : regression coefficients
+$\sigma$ : robust estimate of residual standard deviation
+$\rho$: Robust loss function
 
 Original Data & Robust Regression
 ```{r}
@@ -141,79 +149,138 @@ summary(high_df_model)
 
 ```
 Lower than 4, and the data did not converge
+```{r}
+set.seed(2025)
+bmi_data <- generate_t_copula_data(n = 100, nu = 5)
+
+# Add a strong linear effect of bmi on glucose
+bmi_data$glucose <- bmi_data$glucose + 2 * bmi_data$bmi  # Adjust the coefficient (0.5) as needed
+
+#center
+bmi_data <- bmi_data %>% mutate(across(everything(), ~ . - mean(.)))
+
+#robust regression model
+bmi_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = bmi_data)
+summary(bmi_model)
+```
 
 Visualizing results
 
 ```{r}
+
+true_mean_glucose <- 0 #because data was centered around 0
+
+#variance
 calculate_variance <- function(model) {
   return(diag(vcov(model)))
 }
 
-#function to calculate bias (difference between predicted means and true means)
-calculate_bias <- function(model, true_means, data) {
-  predicted_means <- predict(model, newdata = data.frame(
-    cholesterol = true_means[2],
-    bmi = true_means[3],
-    blood_pressure = true_means[4]
+#bias for glucose 
+calculate_bias_glucose <- function(model, true_mean_glucose, data) {
+  predicted_mean_glucose <- predict(model, newdata = data.frame(
+    cholesterol = 0,  # all centered
+    bmi = 0,          
+    blood_pressure = 0
   ))
   
-  #compared 
-  bias <- predicted_means - true_means[1]  #true mean of BloodPressure
+  #bias = predicted mean - true mean
+  bias <- predicted_mean_glucose - true_mean_glucose
   return(bias)
 }
 
-#true parameters - changed to all 0 since I centered the data 
-true_means <- c(0, 0, 0, 0)  # Mean vector (mu)
-
-store_results <- function(model, scenario_name, true_means, data) {
+#store results
+store_results <- function(model, scenario_name, true_mean_glucose, data) {
   variance <- calculate_variance(model)
-  bias <- calculate_bias(model, true_means, data)
+  bias <- calculate_bias_glucose(model, true_mean_glucose, data)
   
   data.frame(
     Scenario = scenario_name,
-    Variance = variance,
-    Bias = bias
+    Variance_Intercept = variance[1],
+    Variance_BloodPressure = variance[2],
+    Variance_Cholesterol = variance[3],
+    Variance_BMI = variance[4],
+    Bias_Glucose = bias
   )
 }
 
+#store results for each scenario
 results <- rbind(
-  store_results(original_model, "Original Data", true_means, original_data),
-  store_results(large_model, "Larger Sample Size", true_means, large_data),
-  store_results(high_corr_model, "High Correlation Levels", true_means, high_corr_data),
-  store_results(low_corr_model, "Low Correlation Levels", true_means, low_corr_data),
-  store_results(high_df_model, "High df (Less Non-Normal)", true_means, high_df_data),
-  store_results(low_df_model, "Low df (More Non-Normal)", true_means, low_df_data)
+  store_results(original_model, "Original Data", true_mean_glucose, original_data),
+  store_results(large_model, "Larger Sample Size", true_mean_glucose, large_data),
+  store_results(high_corr_model, "High Correlation Levels", true_mean_glucose, high_corr_data),
+  store_results(low_corr_model, "Low Correlation Levels", true_mean_glucose, low_corr_data),
+  store_results(high_df_model, "High df (Less Non-Normal)", true_mean_glucose, high_df_data),
+  store_results(low_df_model, "Low df (More Non-Normal)", true_mean_glucose, low_df_data),
+  store_results(bmi_model, "BMI Effect Model", true_mean_glucose, bmi_data)
 )
+
+#results table
+kable(results, caption = "Comparison of Variance and Bias Across Different Scenarios")
 ```
 
 
 ```{r}
-#variance
-ggplot(results, aes(x = Scenario, y = Variance, fill = Scenario)) +
-  geom_bar(stat = "identity") +
+#variance (for coefficients)
+variance_long <- results %>%
+  pivot_longer(cols = starts_with("Variance"), 
+               names_to = "Coefficient", 
+               values_to = "Variance")
+
+ggplot(variance_long, aes(x = Scenario, y = Variance, fill = Coefficient)) +
+  geom_bar(stat = "identity", position = "dodge") +
   labs(title = "Variance of Coefficients", x = "Scenario", y = "Variance") +
   theme_minimal()
 ```
 
 
 ```{r}
-#bias
-ggplot(results, aes(x = Scenario, y = Bias, fill = Scenario)) +
+#bias (for glucose)
+ggplot(results, aes(x = Scenario, y = Bias_Glucose, fill = Scenario)) +
   geom_bar(stat = "identity") +
-  labs(title = "Bias of Coefficients", x = "Scenario", y = "Bias") +
+  labs(title = "Bias of Glucose Predictions", x = "Scenario", y = "Bias") +
   theme_minimal()
 ```
 
-
 ```{r}
+library(dplyr)
 library(knitr)
-kable(results, caption = "Comparison of Variance and Bias Across Different Scenarios")
+
+# Function to extract R^2 and significant predictors
+extract_results <- function(model, scenario_name) {
+  # Extract R^2
+  r_squared <- summary(model)$r.squared
+  
+  # Extract coefficients and p-values
+  coef_table <- summary(model)$coefficients
+  significant_predictors <- rownames(coef_table)[coef_table[, "Pr(>|t|)"] < 0.05]
+  
+  # Remove intercept from significant predictors
+  significant_predictors <- significant_predictors[significant_predictors != "(Intercept)"]
+  
+  # Combine into a data frame
+  data.frame(
+    Scenario = scenario_name,
+    R_Squared = r_squared,
+    Significant_Predictors = paste(significant_predictors, collapse = ", ")
+  )
+}
+
+results_table <- rbind(
+  extract_results(original_model, "Original Data"),
+  extract_results(large_model, "Larger Sample Size"),
+  extract_results(high_corr_model, "High Correlation Levels"),
+  extract_results(low_corr_model, "Low Correlation Levels"),
+  extract_results(high_df_model, "High df (Less Non-Normal)"),
+  extract_results(low_df_model, "Low df (More Non-Normal)"),
+  extract_results(bmi_model, "BMI Effect")
+)
+
+
+kable(results_table, caption = "Model Performance and Significant Predictors")
 ```
 
 
-```{r}
-
-
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
 ```
 
 ## Refrences
