@@ -314,66 +314,230 @@ knitr::kable(comparison_matrix,
 
 ## Simulation Study 1
 
-*Note: we have done this for a multivariable dist. with 4 variables rather than 2... harder to visualize/keep track of all of the different covars (since there are 6 pairwise correlations/regressions)*
-
 ### 3.1 Fit a regression model to the simulated data while assuming that data are i.i.d and normally distributed
-
-```{r simstudy1_1}
-# Linear regression -- assumes iid and X ~ N() [i.e. errors/residuals ~ N()]
-
-# Generate a dataset with 1000 samples and df = 5
-nn_3_1 = 1000
-df_3_1 = 5
-generated_data_3_1 <- generate_t_copula_data(n = nn_3_1, nu = df_3_1)
-
-# function for storing beta & 95% CI from each pairwise reg
-pairwise_linreg_storebeta <- function(gen_data, samp_size){
-  lm_out <- list()
-  for (ii in colnames(gen_data)){
-    for (jj in colnames(gen_data)){
-      # same variable
-      if (ii == jj){ # pass
-      }
-      # 6 unique pairwise regressions for four variables (3 + 2 + 1)
-      else{
-        linreg <- lm(gen_data[[ii]] ~ gen_data[[jj]]) # ii = y ~ jj = x
-        beta <- linreg$coefficients[2] # regression coefficient
-        lower <- confint(linreg)[2] # UB & LB of 95% CI for reg coeff
-        upper <- confint(linreg)[4]
-        # store output, named
-        lm_out[[paste0(ii, "_", jj)]] <- c(vars = paste0(ii,"_", jj), samp_size = samp_size, beta=beta, lower=lower, upper=upper)  # stored as y_x
-      }
-    }
-  }
-  return(lm_out)
-}
-```
 
 ### 3.2 Conduct a simulation study that varies sample sizes, correlation levels, or degree of non-normality to assess bias in parameter estimates, type I error in hypothesis testing and coverage in conference intervals.
 
-*Interpretation: 'parameter estimates' refers to correlation only (not beta or intercept for simple linear regression)*
+* *Interpretation: "vary sample size, correlation level, or degree of non-normality". In the code below, we choose from these three options: to vary sample size.*
+* *Interpretation: "assess bias in parameter estimates, type I error in hypothesis testing, and coverage in CIs". In the code below, we assess these by a) calculating the average coefficient estimates under each setting, and b) calculating the percentage of 95% CIs [calculated under the incorrect assumption of normality] for each setting which include the true, theoretical value for a given regression coefficient.*
+* *Note: Type I error in hypothesis testing (reject the null H0, when the null is in fact true) depends on the specific H0 being posited. In this case, we record below the percentage of cases where the null relationship [specified in our true correlation matrix, above] between Glucose (Y) & two of the X variables (BMI & Blood Pressure, X3 & X3) is _incorrectly_ characterized as a null relationship--i.e. when the 95% CIs for the regression coefficients of those two variables do not include 0. This is equivalent because, within the hypothesis testing framework, a 95% CI is equivalent to a p-value--so a "Type I error" is equivalent to a 95% CI _not_ including zero when it should, in fact, include zero.* ----> OH but: it is actually distinct, because we have evaluated it empirically... the number of times that the CI does NOT include the true value within the 1000 simulations is related to the Type I error! (also: extends cleanly to the non-zero value)
 
-* Note: as per instructions, I have fit a regression model. However, the easier way to calculate this would be with cor() in R. Is there a theoretical solution for the linear regression output? In that case, assessing CIs & bias would be simple. However, since I'm not 100% clear on the code under "# Generate Independent Heavy-Tailed t-Distributions", I'm not clear what those theoretical values would be... 
-* Will be very easy to plot the single theoretical value when I have that cleared up [and will be obvious whether the 95% CI includes/covers it]
+```{r simstudy1_1}
+# Fit (multivariable) linear regression -- assumes iid and errors/residuals ~ N(), which can be violated with skewed/heavy-tailed distributions of explanatory or outcome variables (which is the case for all variables we have generated)
+
+# clean environment
+rm(list=setdiff(ls(), c("generate_t_copula_data","rho_vec", "p", "mu"))) # all I need for simulation study 1
+
+# Get theoretical regression coefficients:
+
+# ```{r generate_data} -- due to the work in this chunk, the standard deviation was rescaled (i.e. not dependent purely on t distribution df) -- numbers pulled out below:
+sds_tdists <- c("glucose" = 15, "cholesterol" = 25, "BMI" = 3, "blood_pressure" = 10)
+# regression coefficient = r*(sd_y/sd_x)
+# for the 3 regression coefficients: Glucose-Cholesterol, Glucose-BMI, Glucose-BP: 
+# Glucose-Cholesterol: 0.5 * 15/25
+# Glucose-BMI, Glucose-BP: 0 (r=0)
+target_reg_coeffs <- c("glucose_chol" = 0.5 * 15/25, "glucose_bmi" = 0, "glucose_bp" = 0)
+
+# Now: choose one of the variables as the output, the other three as covariates. Choice is arbitrary, since this
+# simulation study is a proof of concept/demonstration.
+
+# Choose Glucose as Y; Cholesterol, BMI, Blood Pressure as X1, X2, X3
+
+# show that the linreg can run:
+gendata_ss1_test <- generate_t_copula_data(n = 100, nu = 3) # 3 df--lower df means higher skewness, but does not determine sd, due to the scaling performed above
+lm(gendata_ss1_test$Glucose ~ gendata_ss1_test$Cholesterol + gendata_ss1_test$BMI + gendata_ss1_test$BloodPressure)
+# It does a great job with the true beta1!...not so great with the covariates that should have been null
+rm(gendata_ss1_test)
+```
+
+
+```{r}
+# Vary sample size
+# 10 different sample sizes -- explore 10 different orders of magnitude of sample size (rounded)
+vary_sampsize <- ceiling(10^seq(1,4.5,length.out=10))
+
+# generate samples & store correlations
+tdist_df = 3 # arbitrary choice -- degree of skewness/variation from normality (t dist df) fixed for these simulations
+
+# custom fxn
+# function: store beta & 95% CI (calculated assuming linearity) from each regression--varying samp size
+lm_varyss_storebetas <- function(fxn_gen, samp_sizes, tdist_degfree){ # give a fxn to generate data, list of sample sizes to vary through, & degrees of freedom("df") of t dists (fixed in this simulation)
+ 
+   # store lm outputs in a list
+  lm_out <- list()
+  
+  # iterate through different sample sizes [# samples generated from fxn]
+  for (nn in samp_sizes){
+    
+      gendata <- fxn_gen(n = nn, nu = tdist_df)
+      # run regression
+      lm_nn <- lm(gendata$Glucose ~ gendata$Cholesterol + gendata$BMI + gendata$BloodPressure)
+      
+      # reformat to make it easy to combine/compress later for plotting -- each list entry is a dataframe
+      # CIs
+      lm_outputs <- as.data.frame(confint(lm_nn))
+      colnames(lm_outputs) <- c("lower_95", "upper_95")
+      lm_outputs <- lm_outputs[2:4,]
+      rownames(lm_outputs) <- c("Gluc_Chol", "Gluc_BMI", "Gluc_BP")
+      # point values
+      lm_outputs$point_val <- lm_nn$coefficients[2:4] # note: this works VERY specifically as written for our scenario--subsets are hard-coded for simplicity
+      # marker for loop [generated sample size] & true values & pairname
+      lm_outputs$gensampsize <- nn
+      lm_outputs$true_val <- c(0.3, 0, 0) # from target_reg_coeffs, above
+      lm_outputs$regcoeff <- c("Gluc_Chol", "Gluc_BMI", "Gluc_BP")
+      
+      # store in list
+      lm_out[[paste0("sampsize", nn)]] <- lm_outputs
+  }
+  
+  # exit loop, return filled-in list    
+  return(lm_out)
+  }
+```
+
+```{r}
+
+# delete this, just keeping for myself/potential troubleshooting later
+
+# # test
+# testing <- lm_varyss_storebetas(fxn_gen = generate_t_copula_data, samp_sizes = vary_sampsize, tdist_degfree = tdist_df) # it's not storying the point estimate lol WHY
+# 
+# 
+#   
+# testblock <- lm(gendata_ss1_test$Glucose ~ gendata_ss1_test$Cholesterol + gendata_ss1_test$BMI + gendata_ss1_test$BloodPressure)
+# # CIs
+# testinggg <- as.data.frame(confint(testblock))
+# colnames(testinggg) <- c("lower_95", "upper_95")
+# testinggg <- testinggg[2:4,]
+# rownames(testinggg) <- c("Gluc_Chol", "Gluc_BMI", "Gluc_BP")
+# # point values
+# testinggg$point_val <- testblock$coefficients[2:4]
+# # that works, in this order!
+# # and add marker
+# testinggg$gensampsize <- 3
+```
+
+```{r}
+# simstudy1_listdfs <- lm_varyss_storebetas(fxn_gen = generate_t_copula_data, samp_sizes = vary_sampsize, tdist_degfree = tdist_df)
+# simstudy1_df <- do.call(rbind, simstudy1_listdfs) # note: can scale this to cover a wider range of sample sizes
+# rownames(simstudy1_df) <- seq(1,nrow(simstudy1_df))
+```
+
+```{r}
+# Now: repeat this 1000 times -- to get the % of CIs which cover the true value [in those 1000 replications/simulations] [for a given sample size]
+
+# note: no need to differentiate between the replications, so they can be stored without numbering
+
+num_simulations = 100 # WILL BE 1000 -- but start with 100 to show it works!
+
+run_simstudy1_varysampsize <- function(nsim){
+  # store each run of the simulation
+  list_dfs <- list()
+  # run #nsim times
+  for (ii in seq(1,nsim)){
+    simstudy1_listdfs <- lm_varyss_storebetas(fxn_gen = generate_t_copula_data, samp_sizes = vary_sampsize, tdist_degfree = tdist_df)
+    simstudy1_df <- do.call(rbind, simstudy1_listdfs) # note: can scale this to cover a wider range of sample sizes
+    rownames(simstudy1_df) <- seq(1,nrow(simstudy1_df))
+    list_dfs[[ii]] <- simstudy1_df
+  }
+  # unlist/combine, clean up -- no need to identify iterations
+  simstudy1_nsim <- do.call(rbind, list_dfs) # note: can scale this to cover a wider range of sample sizes
+  rownames(simstudy1_nsim) <- seq(1,nrow(simstudy1_nsim))
+  return(simstudy1_nsim)
+}
+```
+
+```{r}
+# generate 1000 samples
+set.seed(445578)
+simstudy1_1000sim <- run_simstudy1_varysampsize(num_simulations)
+
+# save output (takes time to run)
+write.csv(simstudy1_1000sim, "simstudy1_1000sim.csv", row.names = FALSE)
+```
+
+```{r}
+# read in csv
+
+# create confidence interval coverage statistics
+library(dplyr)
+library(tidyr)
+
+# generate boolean variable -- was the true value contained within the 95% CI
+simstudy1_1000sim$trueval_inCI <- (simstudy1_1000sim$true_val <= simstudy1_1000sim$upper_95) & (simstudy1_1000sim$true_val >= simstudy1_1000sim$lower_95)
+
+# get the percentage for which this was true among the [num_simulations] simulations FOR each reg coeff (3) FOR each [sampsize] setting
+simstudy1_1000sim_typeone <- simstudy1_1000sim |> 
+  group_by(gensampsize, regcoeff) |> 
+  summarise(in_CI_pct = mean(trueval_inCI))
+
+# check
+# simstudy1_1000sim[simstudy1_1000sim$regcoeff=="Gluc_BP" & simstudy1_1000sim$gensampsize == 147, ] # 3 false, matches up! : )
+
+# get empirical 95% CI & mean based off the [num_simulations] values/replications
+
+
+simstudy1_1000sim_typeone <- simstudy1_1000sim |> 
+  group_by(gensampsize, regcoeff) |> 
+  summarise(in_CI_pct = mean(trueval_inCI),
+            empirical_lower95 = quantile(point_val, 0.05),   # empirical 95% CI and mean estimated betas from [num_simulations]
+            empirical_upper95 = quantile(point_val, 0.95),
+            empirical_mean = quantile(point_val, 0.5),
+            true_val = mean(true_val))
+```
+
+
+```{r}
+# Plot a) empirical CIs results against the theoretical values (visualize precison, bias)
+
+ggplot(data=simstudy1_1000sim_typeone, aes(x = gensampsize, y = empirical_mean)) +
+  
+  geom_point() +
+  geom_errorbar(aes(ymin = empirical_lower95, ymax = empirical_upper95), 
+                width = 0.2, position = position_dodge(width = 0.9)) + 
+  facet_wrap(~regcoeff, scales="free_y") + 
+  scale_x_log10() +
+  # plot theoretical value
+  geom_abline(data = simstudy1_1000sim_typeone, aes(intercept=true_val, slope = 0), color="green", size=0.3)+
+  ggtitle("Empirical 95% CIs for coefficient estimate (1000 runs)")
+
+# Plot b) % "in CI" (visualize probability of Type I error)
+ggplot(data=simstudy1_1000sim_typeone, aes(x = gensampsize, y = in_CI_pct)) +
+  geom_line(col="gray") + 
+  geom_point() +
+  facet_wrap(~regcoeff, scales="free_y") + 
+  scale_x_log10() +
+  ggtitle("Percentage of 95% CIs [under normality] which included the true value")
+
+# note: these results SEEM counterintuitive, but it makes sense!! with the sample size increasing, we *think* we are more precise--but as the CI shrinks and shrinks, it is less likely to include the true value (since we are using an inappropriate model) EVEN AS the model gets more and more confident in its estimate! FASCINATING
+```
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# code below is redundant, just need to plot!
 
 ```{r simstudy1_2}
 # 3.2.1 Vary sample size
 
-# 10 different sample sizes -- explore different orders of magnitude of sample size, rounded
-sampsize_3_2 <- ceiling(10^seq(1,4.5,length.out=10))
 
-# generate samples & store correlations
-# degree of skewness/variation from normality is fixed for these simulations (df)
-df_3_2 = 5
-lm_varysampsize_store <- list()
-
-# assess bias in parameter estimates, CI coverage (true value included/not included in 95% CI) [implies future Type I/II errors]
-
-# neater approach: extract beta & 95% CI [**note: under assumption of ~ iid, N(] (!)
-for (ii in sampsize_3_2){
-  generated_data_loop <- generate_t_copula_data(n = ii, nu = df_3_2)
-  lm_varysampsize_store[[paste0("sampsize", ii)]] <- c(pairwise_linreg_storebeta(generated_data_loop, samp_size = ii))
-}
 
 # collapse & plot all
 testing <- as.data.frame(t(as.data.frame((c(lm_varysampsize_store))))) # 120 obs-nice
