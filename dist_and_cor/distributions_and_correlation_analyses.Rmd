@@ -291,7 +291,7 @@ comparison_matrix <- data.frame(
                  "Cholesterol", "Cholesterol", "BMI"),
   Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", 
                  "BMI", "Blood Pressure", "Blood Pressure"),
-  Target_Correlation = c(0.5, 0.2, 0.1, 0.1, 0.2, 0.4),  # From defined Sigma
+  Target_Correlation = c(0.5, 0.0, 0.0, 0.0, 0.0, 0.4),  # From defined Sigma
   Empirical_Correlation = c(
     empirical_corr["Glucose", "Cholesterol"],
     empirical_corr["Glucose", "BMI"],
