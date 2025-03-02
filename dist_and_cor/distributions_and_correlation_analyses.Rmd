@@ -70,6 +70,10 @@ Sigma <- bdiag(block1, block2)
 # Convert to a standard matrix format
 # Ensure the correlation matrix is positive definite
 Sigma <- as.matrix(nearPD(Sigma)$mat) 
+colnames(Sigma) <- c("Glucose", "Cholesterol", "BMI", "BloodPressure")
+rownames(Sigma) <- c("Glucose", "Cholesterol", "BMI", "BloodPressure")
+df_sigma <- as.data.frame(Sigma)
+knitr::kable(df_sigma, caption = "Correlation Matrix of Block-diagonal", digits = 3)
 ```
 
 Copulas are the mechanism which allows us to isolate the dependency structure in a multivariate distribution. In particular, we can construct any multivariate distribution by separately specifying the marginal distributions and the copula. (Haugh, 2016) https://www.columbia.edu/~mh2078/QRM/Copulas.pdf
@@ -104,7 +108,6 @@ Higher BMI is strongly associated with increased blood pressure, as obesity cont
 This correlation reflects real-world epidemiological findings in obesity and hypertension studies.  
 
 ```{r t_copula_generation}
-# Extract lower triangle correlations
 rho_vec <- Sigma[lower.tri(Sigma)]  
 
 # Define the t-Copula
