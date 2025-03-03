@@ -11,17 +11,37 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ## Design Simulation study 2
 
-Identify a statistical inference tool that could accommodate the correlation and non-normality ((e.g., a robust regression approach, generalized estimating equations (GEE) for correlated data, or a Bayesian method with appropriate priors).
+### Methods
 
-Use simulation that is similar to Simulation 1 to this inference tool provides valid results for non-normal, correlated data, and compare these results to the standard inference tool in study 1.
+  For this simulation, robust regression was used to mitigate the influence of outliers and heavy-tailed distributions. It is useful when ordinary least squares assumptions don't hold up. Specifically, MM-estimation was performed because this method is useful when handling correlated and non-normal data. The model works by using two steps. The first step is an initial robust estimation with $\beta$ of high resistance to outliers, and the second step involves refining the estimate using a robust lost function. This form of regression downweigns the influence of outliers and works well with skewed data. MM-estimation robust regressing has a high breakdown point compared to other regression models, meaning a high fraction of outliers for which a model won't break down.
+  \newline
+Data generation was done via by creating a function from the t-Copula code used in parts 1 and 2 of this study. To summarize, this function used a block-diagonal correlation structure, created a heavy tailed distribution, and sets realistic bounds for the predictors and outcomes. The simulation scenarios are outlined in the table below. 
+\newline 
+Table : Simulation Scenarios 
 
-For this simulation, robust regression was used to mitigate the influence of outliers and heavy-tailed distributions. It is useful when ordinary least squares assumptions don't hold up Specifically, MM-estimation was performed because this method is useful when handeling correlated and non-normal data. The model works by using two steps. The first step is an initial robust estimation with $\beta$ of high resistance to outliers, and the second step involves refining the estimate using a robust lost function. This form of regression downweigns the influence of outliers and works well with skewed data. MM-estimation robust regressing has a high breakdown point compared to other regression models, meaning a high fraction of outliers for which a model won't break down.
+| Scenario       | n  | Degrees of Freedom | Correlation 1  | Correlation 2 | Extra            | 
+|----------------|----|--------------------|----------------|---------------|------------------|
+|Original        |100 |5                   | 0.5            | 0.4           | N/A              |
+|----------------|----|--------------------|----------------|---------------|------------------|
+|Larger sample n |500 |5                   | 0.5            | 0.4           | N/A              |
+|----------------|----|--------------------|----------------|---------------|------------------|
+|High Correlation|500 |5                   | 0.8            | 0.7           | N/A              |
+|----------------|----|--------------------|----------------|---------------|------------------|
+|Low Correlation |500 |5                   | 0.2            | 0.1           | N/A              |
+|----------------|----|--------------------|----------------|---------------|------------------|
+|High DoF        |500 |6                   | 0.5            | 0.4           | N/A              |
+|----------------|----|--------------------|----------------|---------------|------------------|
+|Low DoF         |500 |4                   | 0.5            | 0.4           | N/A              |
+|----------------|----|--------------------|----------------|---------------|------------------|
+|BMI Interaction |500 |5                   | 0.5            | 0.4           |Linear BMI/Glucose|
+
 ```{r}
 library(tidyverse)
 library(ggplot2)
 library(robustbase)
 library(copula)
 library(Matrix)
+library(kableExtra)
 ```
 
 ```{r}

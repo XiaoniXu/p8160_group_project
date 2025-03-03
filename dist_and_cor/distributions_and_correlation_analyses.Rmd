@@ -5,7 +5,7 @@ date: "March 3, 2025"
 output: html_document
 ---
 
-```{r load_packages, message=FALSE, warning=FALSE}
+```{r load_packages, message=FALSE, warning=FALSE, echo=FALSE}
 library(tidyverse)
 library(MASS)  
 library(Matrix)
@@ -17,6 +17,8 @@ library(DT)
 library(patchwork)
 library(kableExtra)
 library(MVN)
+library(robustbase)
+library(knitr)
 ```
 
 
@@ -725,22 +727,50 @@ As the degrees of freedom increased (i.e. less deviation from normality), the pr
 
 # 2. Simulation Study 2
 
-## Design Simulation study 2
 
-Identify a statistical inference tool that could accommodate the correlation and non-normality ((e.g., a robust regression approach, generalized estimating equations (GEE) for correlated data, or a Bayesian method with appropriate priors).
+### Simulation studies and procedures
 
-Use simulation that is similar to Simulation 1 to this inference tool provides valid results for non-normal, correlated data, and compare these results to the standard inference tool in study 1.
+  For this simulation, robust regression was used to mitigate the influence of outliers and heavy-tailed distributions. It is useful when ordinary least squares assumptions don't hold up. Specifically, MM-estimation was performed because this method is useful when handling correlated and non-normal data. The model works by using two steps. The first step is an initial robust estimation with $\beta$ of high resistance to outliers, and the second step involves refining the estimate using a robust lost function. This form of regression downweigns the influence of outliers and works well with skewed data. MM-estimation robust regressing has a high breakdown point compared to other regression models, meaning a high fraction of outliers for which a model won't break down.
+\newline
 
-For this simulation, robust regression was used to mitigate the influence of outliers and heavy-tailed distributions. It is useful when ordinary least squares assumptions don't hold up Specifically, MM-estimation was performed because this method is useful when handeling correlated and non-normal data. The model works by using two steps. The first step is an initial robust estimation with $\beta$ of high resistance to outliers, and the second step involves refining the estimate using a robust lost function. This form of regression downweigns the influence of outliers and works well with skewed data. MM-estimation robust regressing has a high breakdown point compared to other regression models, meaning a high fraction of outliers for which a model won't break down.
-```{r}
-library(tidyverse)
-library(ggplot2)
-library(robustbase)
-library(copula)
-library(Matrix)
-```
+The model formula for MM-Robust regression is:
+$$
+Y = \beta_0 + \beta_1*X_1 + \beta_2 * X_2 + \beta_3 * X_3 + \epsilon
+$$
+Where Y is glucose, and X are the predictors cholesterol, BMI, and blood Pressure. $\beta$ is the coefficent for each predictor and $\epsilon$ is the error term. 
+\newline
+The formula for the robust estimator is:
+$$
+\hat{\beta} = \arg\min_{\beta} \sum_{i=1}^{n} \rho \left( \frac{y_i - x_i^\top \beta}{\hat{\sigma}} \right)
+$$
 
-```{r}
+Where:
+
+$y_i$ : dependent variable
+$x_i$ : predictor variable
+$\beta$ : regression coefficients
+$\sigma$ : robust estimate of residual standard deviation
+$\rho$: Robust loss function
+
+  \newline
+Data generation was done via by creating a function from the t-Copula code used in parts 1 and 2 of this study. To summarize, this function used a block-diagonal correlation structure, created a heavy tailed distribution, and sets realistic bounds for the predictors and outcomes. Additionally, the data was centered around the true mean for each simulation by subtracting the true mean for each predictor from each value. This centers the data around 0 and decreases the variance of the intercept value in the modesl. The simulation scenarios are outlined in the table below.
+\newline 
+Table: Simulation Scenarios 
+
+| Scenario       | n  | Degrees of Freedom | Correlation 1  | Correlation 2 | Extra            | 
+|----------------|----|--------------------|----------------|---------------|------------------|
+|Original        |100 |5                   | 0.5            | 0.4           | N/A              |
+|Larger sample n |500 |5                   | 0.5            | 0.4           | N/A              |
+|High Correlation|100 |5                   | 0.8            | 0.7           | N/A              |
+|Low Correlation |100 |5                   | 0.2            | 0.1           | N/A              |
+|High DoF        |100 |6                   | 0.5            | 0.4           | N/A              |
+|Low DoF         |100 |4                   | 0.5            | 0.4           | N/A              |
+|BMI Interaction |100 |5                   | 0.5            | 0.4           |Linear BMI/Glucose|
+
+\newline
+The packed used for MM-estimator robust regression was "robustbase" and the function used was "lmrob". Models were assessed by variance, bias, and R Squared value. Variance and R squared are reported in the output of lmrob, and bias was found by calculating the centered expected value of glucose using each model. Since the generated data was centered around zero, the expected value of glucose calculated from the model represents the actual expected value of glucose minus the true mean. 
+
+```{r, echo=FALSE}
 #taken from parts 1 and 2 and turned into a function so I can change parapeters in the simulation
 
 #function to generate correlated non-normal data using a t-Copula (used part 2)
@@ -802,17 +832,8 @@ blood_pressure <- blood_pressure_raw[blood_pressure_raw >= blood_pressure_min & 
 }
 
 ```
-$$
-\hat{\beta} = \arg\min_{\beta} \sum_{i=1}^{n} \rho \left( \frac{y_i - x_i^\top \beta}{\hat{\sigma}} \right)
-$$
-$y_i$ : dependent variable
-$x_i$ : predictor variable
-$\beta$ : regression coefficients
-$\sigma$ : robust estimate of residual standard deviation
-$\rho$: Robust loss function
 
-Original Data & Robust Regression
-```{r}
+```{r,echo=FALSE, results='hide'}
 set.seed(2025)
 
 original_data <- generate_t_copula_data(n = 100, nu = 5)
@@ -821,9 +842,8 @@ original_data <- original_data %>%
 original_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = original_data)
 summary(original_model) #robust regression using MM
 ```
-Larger Sample Size
 
-```{r}
+```{r, echo=FALSE, results='hide'}
 set.seed(2025)
 
 large_data <- generate_t_copula_data(n = 500, nu = 5)
@@ -832,9 +852,8 @@ large_data <- large_data %>%
 large_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = large_data)
 summary(large_model)
 ```
-Varying Correlation Levels
 
-```{r}
+```{r, echo=FALSE, results='hide'}
 set.seed(2025)
 high_corr_data <- generate_t_copula_data(n = 100, nu = 5, rho_mod = c(0.8, 0.7))
 high_corr_data <- high_corr_data %>%
@@ -849,8 +868,7 @@ low_corr_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = low
 summary(low_corr_model)
 ```
 
-Varying Non-Normality Degree
-```{r}
+```{r, echo=FALSE, results='hide'}
 low_df_data <- generate_t_copula_data(n = 100, nu = 4)
 low_df_data <-low_df_data %>%
   mutate(across(everything(), ~ . - mean(.)))
@@ -864,12 +882,12 @@ high_df_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = high
 summary(high_df_model)
 
 ```
-Lower than 4, and the data did not converge
-```{r}
+
+```{r, echo=FALSE, results='hide'}
 set.seed(2025)
 bmi_data <- generate_t_copula_data(n = 100, nu = 5)
 
-# Add a strong linear effect of bmi on glucose
+#Add a strong linear effect of bmi on glucose
 bmi_data$glucose <- bmi_data$glucose + 2 * bmi_data$bmi  # Adjust the coefficient (0.5) as needed
 
 #center
@@ -879,10 +897,13 @@ bmi_data <- bmi_data %>% mutate(across(everything(), ~ . - mean(.)))
 bmi_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = bmi_data)
 summary(bmi_model)
 ```
+## Model Results
 
-Visualizing results
+The tables in this section include results that are important to understanding how each model fits the generated data and how changing simulation scenarios effects the model generation. For the full model output, please see the appendix. 
 
-```{r}
+\newline
+The table below show the variance of the intercepts and each predictor for all of the models. The last column on the right lists the bias for glucose for each model. The lowest bias was -0.06 for the high correlation level model. 
+```{r, echo=FALSE}
 
 true_mean_glucose <- 0 #because data was centered around 0
 
@@ -930,50 +951,23 @@ results <- rbind(
   store_results(bmi_model, "BMI Effect Model", true_mean_glucose, bmi_data)
 )
 
+rownames(results) <- NULL
 #results table
 kable(results, caption = "Comparison of Variance and Bias Across Different Scenarios")
 ```
 
-
-```{r}
-#variance (for coefficients)
-variance_long <- results %>%
-  pivot_longer(cols = starts_with("Variance"), 
-               names_to = "Coefficient", 
-               values_to = "Variance")
-
-ggplot(variance_long, aes(x = Scenario, y = Variance, fill = Coefficient)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  labs(title = "Variance of Coefficients", x = "Scenario", y = "Variance") +
-  theme_minimal()
-```
-
-
-```{r}
-#bias (for glucose)
-ggplot(results, aes(x = Scenario, y = Bias_Glucose, fill = Scenario)) +
-  geom_bar(stat = "identity") +
-  labs(title = "Bias of Glucose Predictions", x = "Scenario", y = "Bias") +
-  theme_minimal()
-```
-
-```{r}
-library(dplyr)
-library(knitr)
-
-# Function to extract R^2 and significant predictors
+The table below show the R squared value for each model and the significant predictors based on p-value.
+```{r, echo=FALSE}
+#extract R^2 and significant predictors
 extract_results <- function(model, scenario_name) {
-  # Extract R^2
   r_squared <- summary(model)$r.squared
   
-  # Extract coefficients and p-values
+#coefficients and p-values
   coef_table <- summary(model)$coefficients
   significant_predictors <- rownames(coef_table)[coef_table[, "Pr(>|t|)"] < 0.05]
   
-  # Remove intercept from significant predictors
   significant_predictors <- significant_predictors[significant_predictors != "(Intercept)"]
   
-  # Combine into a data frame
   data.frame(
     Scenario = scenario_name,
     R_Squared = r_squared,
@@ -991,14 +985,145 @@ results_table <- rbind(
   extract_results(bmi_model, "BMI Effect")
 )
 
+rownames(results) <- NULL
 
 kable(results_table, caption = "Model Performance and Significant Predictors")
 ```
+
+The graph below shows which models had the most variance for the parameter coefficients. 
+```{r, echo=FALSE}
+#variance (for coefficients)
+variance_long <- results %>%
+  pivot_longer(cols = starts_with("Variance"), 
+               names_to = "Coefficient", 
+               values_to = "Variance")
+
+ggplot(variance_long, aes(x = Scenario, y = Variance, fill = Coefficient)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Variance of Coefficients", x = "Scenario", y = "Variance") +
+  theme_minimal()
+```
+### Final models for each simulation:
+
+Original data:
+$$
+Y = 0.267*Cholesterol + \epsilon
+$$
+
+Large sample size:
+$$
+Y = 0.298*Cholesterol + \epsilon
+$$
+
+High correlation:
+$$
+Y = 0.456*Cholesterol + \epsilon
+$$
+
+Low correlation: No significant predictors
+
+
+High degrees of freedom (more skewed):
+$$
+Y = 0.302*Cholesterol + \epsilon
+$$
+
+Low degrees of freedom (less skewed):
+$$
+Y = 0.282*Cholesterol + \epsilon
+$$
+
+BMI correlation:
+$$
+Y = 0.267*Cholesterol + 1.6* BMI + \epsilon
+$$
+
+
+Finally, below compares the bias for each model's predicted value of glucose.
+```{r, echo=FALSE}
+#bias (for glucose)
+ggplot(results, aes(x = Scenario, y = Bias_Glucose, fill = Scenario)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Bias of Glucose Predictions", x = "Scenario", y = "Bias") +
+  theme_minimal()
+```
+
+## Discussion of models for simulation 2
 
 
 # Discussion
 # Key Takeaways
 *fill this in from the slides*
+
+# Appendix: Robust Regression Outputs
+### Original Data 
+```{r,echo=FALSE}
+set.seed(2025)
+
+original_data <- generate_t_copula_data(n = 100, nu = 5)
+original_data <- original_data %>%
+  mutate(across(everything(), ~ . - mean(.)))#centering the data. this prevents the intercept variance from over affecting the data 
+original_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = original_data)
+summary(original_model) #robust regression using MM
+```
+### Larger Sample Size
+
+```{r,echo=FALSE}
+set.seed(2025)
+
+large_data <- generate_t_copula_data(n = 500, nu = 5)
+large_data <- large_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+large_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = large_data)
+summary(large_model)
+```
+### Varying Correlation Levels
+
+```{r, echo=FALSE}
+set.seed(2025)
+high_corr_data <- generate_t_copula_data(n = 100, nu = 5, rho_mod = c(0.8, 0.7))
+high_corr_data <- high_corr_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+high_corr_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = high_corr_data)
+summary(high_corr_model)
+
+low_corr_data <- generate_t_copula_data(n = 100, nu = 5, rho_mod = c(0.2, 0.1))
+low_corr_data <- low_corr_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+low_corr_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = low_corr_data)
+summary(low_corr_model)
+```
+
+### Varying Non-Normality Degree
+```{r, echo=FALSE}
+low_df_data <- generate_t_copula_data(n = 100, nu = 4)
+low_df_data <-low_df_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+low_df_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = low_df_data)
+summary(low_df_model)
+
+high_df_data <- generate_t_copula_data(n = 100, nu = 6)
+high_df_data <- high_df_data %>%
+  mutate(across(everything(), ~ . - mean(.)))
+high_df_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = high_df_data)
+summary(high_df_model)
+
+```
+### BMI Correlation
+```{r, echo=FALSE}
+set.seed(2025)
+bmi_data <- generate_t_copula_data(n = 100, nu = 5)
+
+#Add a strong linear effect of bmi on glucose
+bmi_data$glucose <- bmi_data$glucose + 2 * bmi_data$bmi  # Adjust the coefficient (0.5) as needed
+
+#center
+bmi_data <- bmi_data %>% mutate(across(everything(), ~ . - mean(.)))
+
+#robust regression model
+bmi_model <- lmrob(glucose ~ blood_pressure + cholesterol + bmi, data = bmi_data)
+summary(bmi_model)
+```
 
 # Appendix: Full Code
 
