@@ -16,6 +16,7 @@ library(GGally)
 library(DT)
 library(patchwork)
 library(kableExtra)
+library(MVN)
 ```
 
 
@@ -160,8 +161,14 @@ ggpairs(data_copula_t,
   theme(plot.title = element_text(hjust = 0.5, face="bold", size=14))
 ```
 
-This figure shows a pairs plot of the four simulated variables—-Glucose, Cholesterol, BMI, and Blood Pressure that are generated from a t-copula with a specified block-diagonal correlation structure. Each panel along the diagonal shows the marginal distribution of a single variable. Glucose and Cholesterol peak around 100 mg/dL and 200 mg/dL respectively. Similarly, BMI and Blood Pressure center near 25 and 120 mmHg, and both pairs show relatively heavy tails. In the upper triangle of the figure, the panels report pairwise correlation coefficients, along with significance levels. The scatter plots in the lower triangle show that plots with higher correlations have elongated data clumps indicating linear relationships, and those with near-zero correlations have a more diffuse pattern. The figure demonstrates that our data generation procedure successfully captured both the heavy-tailed character of each marginal distribution and the specified block-diagonal correlation structure. 
+This figure shows a pairs plot of the four simulated variables—-Glucose, Cholesterol, BMI, and Blood Pressure that are generated from a t-copula with a specified block-diagonal correlation structure. Each panel along the diagonal shows the marginal distribution of a single variable. Glucose and Cholesterol peak around 100 mg/dL and 200 mg/dL respectively. Similarly, BMI and Blood Pressure center near 25 and 120 mmHg, and both pairs show relatively heavy tails. In the upper triangle of the figure, the panels report pairwise correlation coefficients, along with significance levels. The scatter plots in the lower triangle show that plots with higher correlations have elongated data clumps indicating linear relationships, and those with near-zero correlations have a more diffuse pattern. The figure demonstrates that our data generation procedure successfully captured both the heavy-tailed character of each marginal distribution and the specified block-diagonal correlation structure.   
+
 # 2. Implement your data generation method
+
+## Generate Data
+
+The following code generates a dataset using a multivariate t-Copula approach to model dependencies among physiological variables (Glucose, Cholesterol, BMI, and Blood Pressure). It constructs a block-diagonal correlation matrix, samples from a t-Copula, and maps the uniform samples to heavy-tailed distributions.   
+The resulting dataset, consisting of 1,000 observations with controlled correlation and variability, is saved as "generated_t_copula_data.csv" for further analysis.  
 
 ```{r generate_data}
 # Function for generate multivariate t-distribution data 
@@ -235,6 +242,9 @@ generated_data <- generate_t_copula_data(n = n, nu = nu)
 write.csv(generated_data, "generated_t_copula_data.csv", row.names = FALSE)
 ```
 
+## Evaluate and Compare with Target Distribution 
+
+Then we create histograms for Glucose, Cholesterol, BMI, and Blood Pressure, overlaid with fitted t-distribution curves. The goal is to visually assess how well a t-distribution matches the generated data.  
 
 ```{r visualization_hist_fit}
 plot_distribution <- function(data, variable_name, df=5) {
@@ -261,41 +271,50 @@ p4 <- plot_distribution(generated_data, "BloodPressure")
 (p1 + p2) / (p3 + p4)
 ```
 
-This visualization compares the empirical distributions of the generated data (blue histograms) with the fitted t-distributions (red curves).  
+This visualization compares the empirical distributions of the generated data (blue histograms) with the fitted t-distributions (red curves). The results show that the t-distribution captures both the central tendency and heavy tails of the data.  
 
-The t-distribution fits well with the generated data with heavy-tailed distributions both at the center and on the tails.
+However, limiting the data range may have resulted in the exclusion of some extreme tail values, which could impact the full representation of heavy-tailed behavior.  
 
-Overall, the t-Copula effectively models correlations and heavy tails, making it a suitable choice for realistic medical data simulation.  
+## Evaluate and Compare with Target Correlation    
 
+We use `cov.trob()` function estimates the location (mean) assuming a heavy-tailed multivariate t-distribution.  
 
 ```{r}
-# Compute the empirical correlation matrix
-empirical_corr <- cor(data_copula_t)
-
-# Display side-by-side comparison
-comparison_matrix <- data.frame(
-  Variable_1 = c("Glucose", "Glucose", "Glucose", 
-                 "Cholesterol", "Cholesterol", "BMI"),
-  Variable_2 = c("Cholesterol", "BMI", "Blood Pressure", 
-                 "BMI", "Blood Pressure", "Blood Pressure"),
-  Target_Correlation = c(0.5, 0.0, 0.0, 0.0, 0.0, 0.4),  # From defined Sigma
-  Empirical_Correlation = c(
-    empirical_corr["Glucose", "Cholesterol"],
-    empirical_corr["Glucose", "BMI"],
-    empirical_corr["Glucose", "BloodPressure"],
-    empirical_corr["Cholesterol", "BMI"],
-    empirical_corr["Cholesterol", "BloodPressure"],
-    empirical_corr["BMI", "BloodPressure"]
-  )
-)
-
-# Display the table
-knitr::kable(comparison_matrix, 
-             caption = "Comparison of Target vs. Empirical Correlations", 
-             digits = 3)
-
+fit_t <- cov.trob(generated_data)
+print(fit_t$center)  # Estimated mean
 ```
 
+The estimated mean values of the generated dataset are very close to the intended means(100, 200, 25, 200) used in the data generation process. This suggests that the location parameter of the multivariate t-distribution is well preserved.  
+
+Now we'll use RMSE to check how well the correlation structure of the generated data matches the target correlation structure from the t-Copula. This will give us a clear measure of how much the actual correlations deviate from what we intended, helping us assess how well the data generation process preserved the dependencies.  
+
+```{r U_t_cor_matrix}
+df_U_t <- as.data.frame(U_t)
+colnames(df_U_t) <- c("Glucose", "Cholesterol", "BMI", "BloodPressure")
+cor_U_t <- cor(df_U_t)
+knitr::kable(cor_U_t, caption = "Correlation Matrix of Transformed t-Copula Samples", digits = 3)
+```
+
+```{r}
+cor_generated_data <- cor(generated_data)
+colnames(cor_generated_data) <- c("Glucose", "Cholesterol", "BMI", "BloodPressure")
+knitr::kable(cor_generated_data, caption = "Correlation Matrix of Generated Data", digits = 3)
+```
+
+The RMSE formula: $\mathrm{RMSE} = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (r_i - \hat{r}_i)^2}$  
+- $r_i$represents the elements of the target correlation matrix (from the t-Copula).    
+- $\hat{r}_i$ represents the elements of the correlation matrix of the generated data.    
+
+```{r comput_rmse}
+rmse <- function(mat1, mat2) {
+  sqrt(mean((mat1 - mat2)^2))
+}
+rmse_value <- rmse(cor_U_t, cor_generated_data)
+```
+
+The RMSE between the target correlation structure (from the t-Copula) and the empirical correlation matrix (from the generated data) is `r round(rmse_value, 4)`. This shows that the generated data closely matches the target correlation structure, with only minor deviations.   
+
+These small differences may result from sampling variability, truncation, or the heavy-tailed nature of the t-distribution, but overall, the t-Copula approach effectively preserves the intended dependencies.  
 
 # 3. Simulation Study 1
 
@@ -989,3 +1008,7 @@ kable(results_table, caption = "Model Performance and Significant Predictors")
 ## References
 
 http://dx.doi.org/10.12732/ijpam.v91i3.7
+
+Ahmadi, A., Baghfalaki, T., Ganjali, M., Kabir, A., & Pazouki, A. (2021). A transition copula model for analyzing multivariate longitudinal data with missing responses. Journal of applied statistics, 49(12), 3164–3177. https://doi.org/10.1080/02664763.2021.1931055  
+
+Palomar, D. P., Zhou, R., & Wang, X. (2023, April 29). Mean Vector and Covariance Matrix Estimation under Heavy Tails. https://cran.r-project.org/web/packages/fitHeavyTail/vignettes/CovarianceEstimationHeavyTail.html
