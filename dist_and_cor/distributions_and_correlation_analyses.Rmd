@@ -322,7 +322,7 @@ These small differences may result from sampling variability, truncation, or the
 
 *"Fit a regression model to the simulated data while assuming that data are i.i.d and normally distributed. Conduct a simulation study that varies sample sizes, correlation levels, or degree of non-normality to assess bias in parameter estimates, type I error in hypothesis testing and coverage in conference intervals. Demonstrate how inference changes as the severity of assumption deviation increases (more skew, heavier tail, stronger correlation."*
 
-* Interpretation of instructions: *"Vary sample size, correlation level, or degree of non-normality."* In the code below, we choose from two of these options: to vary 1. sample size and 2. skewness.
+* Interpretation of instructions: *"Vary sample size, correlation level, or degree of non-normality."* In the code below, we choose from two of these options: to vary 1. sample size and 2. heaviness of tails (i.e. deviation from normality)
 * Interpretation of instructions: *"Assess bias in parameter estimates, type I error in hypothesis testing, and coverage in CIs."* In the code below, we do the following for each simulation setting:
   1) Assess bias in parameter estimates by characterizing the mean estimated regression coefficients across n=1000 simulations, and by characterizing the empirical 95% CI of those estimates.
   2) Calculate the percentage of regression-fit 95% CIs [calculated under the incorrect assumption of normality] from the n=1000 simulationswhich included the true, theoretical value for a given regression coefficient. This gives us the 1 - [the empirical risk of a 'Type I error'], where Type I error can be defined as the probability that the regression-fit  95% CI will exclude the true value of the regression coefficient. Specifically: 1 - P(Type I error) = P(true value ~in~ 95% CI), where P(true value ~in~ 95% CI) is the proportion of the n=1000 simulations for which the true value *was* in the regression-fit 95% CI.
@@ -335,12 +335,12 @@ We choose as our regression model Multiple Linear Regression. In particular, we 
 where Y is Glucose, our outcome; X1 is Cholesterol, X2 is BMI, and X3 is Blood Pressure (BP).
 
 
-Multiple linear regression (MLR) assumes a linear relationship between Y and all X, normally distributed residuals, and no multicollinearity in the set of covariates. The last two of these assumptions are both violated by correlated data we have generated. With skewed, heavy-tailed t-distributions for the independent and dependent variables, the model residuals are likely to not be non-normally distributed; and, with the correlation structure we induced, BMI and BP (two of our covariates) are highly correlated. We expect to see biased estimates and inference in using this regression structure to model our data, given that the data violate model assumptions.
+Multiple linear regression (MLR) assumes a linear relationship between Y and all X, normally distributed residuals, and no multicollinearity in the set of covariates. The last two of these assumptions are both violated by correlated data we have generated. With heavy-tailed t-distributions for the independent and dependent variables, the model residuals are likely to not be non-normally distributed; and, with the correlation structure we induced, BMI and BP (two of our covariates) are highly correlated. We expect to see biased estimates and inference in using this regression structure to model our data, given that the data violate model assumptions.
 
-We examined the effect of sample size (of the generated data samples) and skewness (of the underlying outcome and covariate distributions) on bias and inference (using MLR). 
+We examined the effect of sample size (of the generated data samples) and heavy tails (of the underlying outcome and covariate distributions) on bias and inference (using MLR). 
 
 a) First, we varied generated sample size to examine the effect of sample size on bias & inference. 
-b) Second, we varied the degrees of freedom to the t-distribution to examine the effect of skewness (i.e. deviation from normality) on bias and inference.
+b) Second, we varied the degrees of freedom to the t-distribution to examine the effect of heavy tails (i.e. deviation from normality) on bias and inference.
 
 ### a. The effect of (generated) sample size on bias and inference, using a model which assumes *iid* and normally distributed data
 
@@ -376,7 +376,7 @@ target_reg_coeffs <- c("glucose_chol" = 0.5 * 15/25, "glucose_bmi" = 0, "glucose
 # Choose Glucose as Y; Cholesterol, BMI, Blood Pressure as X1, X2, X3
 
 # show that the linreg can run:
-gendata_ss1_test <- generate_t_copula_data(n = 100, nu = 3) # 3 df--lower df means higher skewness, but does not determine sd, due to the scaling performed above
+gendata_ss1_test <- generate_t_copula_data(n = 100, nu = 3) # 3 df--lower df means heavier tails, but does not determine sd, due to the scaling performed above
 lm(gendata_ss1_test$Glucose ~ gendata_ss1_test$Cholesterol + gendata_ss1_test$BMI + gendata_ss1_test$BloodPressure)
 # It does a great job with the true beta1!...not so great with the covariates that should have been null
 rm(gendata_ss1_test)
@@ -389,7 +389,7 @@ rm(gendata_ss1_test)
 vary_sampsize <- ceiling(10^seq(1,4.5,length.out=10))
 
 # generate samples & store correlations
-tdist_df = 3 # arbitrary choice -- degree of skewness/variation from normality (t dist df) fixed for these simulations
+tdist_df = 3 # arbitrary choice -- degree of heavy tails/variation from normality (t dist df) fixed for these simulations
 
 # custom fxn
 # function: store beta & 95% CI (calculated assuming linearity) from each regression--varying samp size
@@ -554,7 +554,7 @@ As sample sizes increased, the probability of the MLR 95% CIs *including* the tr
 Note that this also explains why the probability of a Type I error is  higher for the Cholesterol regression coefficient (increases to >75% with n>10,000 samples) than it is for BP and BMI regression coefficients. The first plot (MLR coefficient estimates vs. samples size) showed us how  the MLR model produced especially biased estimates for the Cholesterol regression coefficient; therefore, as the 95% CI shrank towards a biased value with increasing sample size, the risk of a Type I error grew faster for this regression coefficient in particular. 
 
 
-### b. The effect of outcome & covariate variable skewness on bias and inference, using a model which assumes *iid* and normally distributed data
+### b. The effect of outcome & covariate variable distribution heavy tails on bias and inference, using a model which assumes *iid* and normally distributed data
 
 - Simulation procedure: 
   - Vary through 7 degrees of freedom settings, applied to all four t-distributions being generated/modeled
@@ -563,28 +563,28 @@ Note that this also explains why the probability of a Type I error is  higher fo
       - Whether or not the "normal" 95% CI included the true theoretical value for the regression coefficient for each covariate (Cholesterol, BMI, BP)
   - For each df setting: Simulate (repeat the above) 1000 times
     - For each covariate, we will summarize...
-      - The mean estimated regression coefficient (across runs) & empirical 95% CI – *This gives us insight into the bias and variability of estimates for models with data from each degrees-of-freedom setting for the t-distributions, which dictates skewness & how much the t-distribution approaches a normal distribution.*
-      - The percentage of "normal" 95% CIs (% of runs) which included the true value – *This gives us insight into the probability of a Type I error, where the confidence interval generated by the the multiple linear regression does not include the true theoretical value. We asses how this changes with each degrees-of-freedom setting for the t-distributions, which dictates skewness & how much the t-distribution approaches a normal distribution.*
+      - The mean estimated regression coefficient (across runs) & empirical 95% CI – *This gives us insight into the bias and variability of estimates for models with data from each degrees-of-freedom setting for the t-distributions, which dictates heaviness of tails & therefore how much the t-distribution approaches a normal distribution.*
+      - The percentage of "normal" 95% CIs (% of runs) which included the true value – *This gives us insight into the probability of a Type I error, where the confidence interval generated by the the multiple linear regression does not include the true theoretical value. We asses how this changes with each degrees-of-freedom setting for the t-distributions, which dictates heavines of tails & therefore how much the t-distribution approaches a normal distribution.*
   
 ```{r}
-# Vary skewness
+# Vary heaviness of tails
 # 10 different sample sizes -- explore 10 different orders of magnitude of sample size (rounded)
-vary_skewness <- 3^seq(1,7)
+vary_heavytail <- 3^seq(1,7)
 
 # generate samples & store correlations
 sampsize_gen = 500 # arbitrary choice -- generated sample size fixed for these simulations
 
 # custom fxn
 # function: store beta & 95% CI (calculated assuming linearity) from each regression--varying samp size
-lm_varyskew_storebetas <- function(fxn_gen, samp_size, tdist_degfree){ # give a fxn to generate data, list of degrees of freedom to iterate through, & sample size for generated sample (fixed in this simulation)
+lm_varyht_storebetas <- function(fxn_gen, samp_size, tdist_degfree){ # give a fxn to generate data, list of degrees of freedom to iterate through, & sample size for generated sample (fixed in this simulation)
   
   # store lm outputs in a list
   lm_out <- list()
   
   # iterate through different sample sizes [# samples generated from fxn]
-  for (skew in tdist_degfree){
+  for (degfree in tdist_degfree){
     
-    gendata <- fxn_gen(n = samp_size, nu = skew)
+    gendata <- fxn_gen(n = samp_size, nu = degfree)
     # run regression
     lm_nn <- lm(gendata$Glucose ~ gendata$Cholesterol + gendata$BMI + gendata$BloodPressure)
     
@@ -596,13 +596,13 @@ lm_varyskew_storebetas <- function(fxn_gen, samp_size, tdist_degfree){ # give a 
     rownames(lm_outputs) <- c("Gluc_Chol", "Gluc_BMI", "Gluc_BP")
     # point values
     lm_outputs$point_val <- lm_nn$coefficients[2:4] # note: this works VERY specifically as written for our scenario--subsets are hard-coded for simplicity
-    # marker for loop [skewness] & true values & pairname
-    lm_outputs$tdist_df <- skew
+    # marker for loop [degfreeness] & true values & pairname
+    lm_outputs$tdist_df <- degfree
     lm_outputs$true_val <- c(0.3, 0, 0) # from target_reg_coeffs, above
     lm_outputs$regcoeff <- c("Gluc_Chol", "Gluc_BMI", "Gluc_BP")
     
     # store in list
-    lm_out[[paste0("tdistdf", skew)]] <- lm_outputs
+    lm_out[[paste0("tdistdf", degfree)]] <- lm_outputs
   }
   
   # exit loop, return filled-in list    
@@ -617,13 +617,13 @@ lm_varyskew_storebetas <- function(fxn_gen, samp_size, tdist_degfree){ # give a 
 
 num_simulations = 1000 # do 1000 runs
 
-run_simstudy1_varyskewness <- function(nsim){
+run_simstudy1_varyht <- function(nsim){
   # store each run of the simulation
   list_dfs <- list()
   # run #nsim times
   for (ii in seq(1,nsim)){
-    simstudy1_listdfs <- lm_varyskew_storebetas(fxn_gen = generate_t_copula_data, 
-                                                samp_size = sampsize_gen, tdist_degfree = vary_skewness)
+    simstudy1_listdfs <- lm_varyht_storebetas(fxn_gen = generate_t_copula_data, 
+                                                samp_size = sampsize_gen, tdist_degfree = vary_heavytail)
     simstudy1_df <- do.call(rbind, simstudy1_listdfs) # note: can scale this to cover a wider range of sample sizes
     rownames(simstudy1_df) <- seq(1,nrow(simstudy1_df))
     list_dfs[[ii]] <- simstudy1_df
@@ -641,7 +641,7 @@ set.seed(445578)
 
 # COMMENTED OUT (saved results to csv: takes several minutes to run)
 
-# simstudy1_1000sim_1 <- run_simstudy1_varyskewness(num_simulations)
+# simstudy1_1000sim_1 <- run_simstudy1_varyht(num_simulations)
 # 
 # # save output (takes time to run)
 # write.csv(simstudy1_1000sim_1, "simstudy1_1000sim_1.csv", row.names = FALSE)
@@ -720,7 +720,7 @@ ggplot(data=simstudy1_1000sim_1_typeone, aes(x = tdist_df, y = in_CI_pct)) +
 
 _Interpretation:_
 
-As the degrees of freedom to the t-distributions increased increased, the bias of the model-estimated regression coefficients decreased. This is as we would expect. The t-distribution approaches the normal distribution as the degrees of freedom approaches infinity; therefore, as we increased the degrees of freedom, we lessened the violation of the MLR that we had introduced by using skewed, non-normal distributions in the data. (Note: we see that precision was not affected by the reduction in skewness. This is as expected, given that sample size was fixed in these simulations.)
+As the degrees of freedom to the t-distributions increased, the bias of the model-estimated regression coefficients decreased. This is as we would expect. The t-distribution approaches the normal distribution as the degrees of freedom approaches infinity; therefore, as we increased the degrees of freedom, we lessened the violation of the MLR that we had introduced by using heavy-tailed, non-normal distributions in the data. (Note: we see that precision was not affected by the reduction in the heaviness of the distribution tails. This is as expected, given that sample size was fixed in these simulations.)
 
 As the degrees of freedom increased (i.e. less deviation from normality), the probability of the MLR 95% CIs *including* the true regression coefficient values increased, indicating that the probability of those CIs *excluding* the true regression coefficient values (i.e. the probability of a Type I error) decreased. This trend was clear for all three covariates. In fact, all three covariates converged around a 95% probability of including the true coefficient value, meaning a 5% probability of a Type I error. This indicates that, as the t-distributions approached normality, the 95% CIs generated by MLR (under the assumption of normality) converged to being _true_ 95% CIs.
 
