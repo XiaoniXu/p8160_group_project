@@ -286,7 +286,7 @@ fit_t <- cov.trob(generated_data)
 print(fit_t$center)  # Estimated mean
 ```
 
-The estimated mean values of the generated dataset are very close to the intended means(100, 200, 25, 200) used in the data generation process. This suggests that the location parameter of the multivariate t-distribution is well preserved.  
+The estimated mean values of the generated dataset are very close to the intended means(100, 200, 25, 120) used in the data generation process. This suggests that the location parameter of the multivariate t-distribution is well preserved.  
 
 Now we'll use RMSE to check how well the correlation structure of the generated data matches the target correlation structure from the t-Copula. This will give us a clear measure of how much the actual correlations deviate from what we intended, helping us assess how well the data generation process preserved the dependencies.  
 
