@@ -1,14 +1,9 @@
 ---
 title: "Project 1: Multivariate Non-Normal Distributions and Correlated Data"
+author: "Shangzi Gao, Elena Jaurequi, Mirah Koota, Xiaoni Xu"
+date: "March 3, 2025"
 output: html_document
 ---
-
-# Hello this is the report for the project 1
-
-# 1. Plan and specify distributions and correlation
-
-We simulate medical data with heavy-tailed a Multivariate t-Distribution using a t-Copula to generate correlated variables: Glucose, Cholesterol, BMI, and Blood Pressure).  
-
 
 ```{r load_packages, message=FALSE, warning=FALSE}
 library(tidyverse)
@@ -22,6 +17,38 @@ library(DT)
 library(patchwork)
 library(kableExtra)
 ```
+
+
+
+# Introduction
+
+Traditionally, statistical models usually assume independence and normality. However, in many real-world scenarios, especially in epidemiology and medical research, data may have heavier tails (more extreme values) and inherent correlations among variables. For example, metabolic variables such as glucose and cholesterol, as well as cardiovascular measures like BMI and blood pressure, are naturally interrelated. Ignoring these features in a regression model can lead to biases and incorrect inferences.
+
+
+
+## Data Generation Method
+
+### Overview
+
+Our goal is to simulate medical data that capture both heavy tails and correaltions among variables. We choose a multivariate t-distribution for its heavy-tailed character and use a t-copula as a predefined correlation structure on the marginal distributions. The four variables are:
+
+- **Glucose** (mg/dL)
+
+- **Cholesterol** (mg/dL)
+
+- **BMI** (Body Mass Index)
+
+- **Blood Pressure** (mmHg)
+
+
+We begin by loading essential R packages such as `tidyverse`, `MASS`, `Matrix`, `copula`, and others that support simulation, matrix operations, and visualization. Key parameters are defined as follows:
+
+Degrees of freedom (nu = 3)
+
+Number of variables (p = 4) and sample size (n = 1000)
+
+Mean vector (mu): Typical values for each health indicator
+
 
 
 ```{r set_parameters, message=FALSE}
@@ -39,17 +66,8 @@ mu <- c(100,   # Mean Glucose Level (mg/dL)
         120)   # Mean Blood Pressure (mmHg)
 ```
 
-- Degrees of Freedom (nu = 5)
 
-Lower degrees of freedom results in a heavier tail, which better simulates extreme cases in medical data (diabetes, obesity, etc.).  
-
-
-- Number of Variables (p = 4)
-
-These four variables (Glucose, Cholesterol, BMI, Blood Pressure) are commonly used metabolic and cardiovascular health indicators and are correlated to each other.
-
-- Choice of Mean Values (mu)  
-The mean values are set based on typical values of a healthy adult.
+The metabolic block with Glucose and Cholesterol is assigned a correlation of 0.5, while the cardiovascular block with BMI and Blood Pressure is assigned a correlation of 0.4. These two correlation blocks are combined using a block-diagonal matrix, and we ensure that the resulting matrix is positive definite by applying the `nearPD` function.
 
 
 ```{r corr_structure}
@@ -76,36 +94,12 @@ df_sigma <- as.data.frame(Sigma)
 knitr::kable(df_sigma, caption = "Correlation Matrix of Block-diagonal", digits = 3)
 ```
 
-Copulas are the mechanism which allows us to isolate the dependency structure in a multivariate distribution. In particular, we can construct any multivariate distribution by separately specifying the marginal distributions and the copula. (Haugh, 2016) https://www.columbia.edu/~mh2078/QRM/Copulas.pdf
+To capture the dependency structure while maintaining flexible marginal distributions, we construct a t-copula. This approach includes extracting the lower triangular portion of the correlation matrix to obtain the copula parameters, and then generating uniform samples on the unit interval. The t-copula is particularly useful here because it incorporates tail dependence. To create the marginal heavy-tailed distributions, we simulate a large number of values from independent t-distributions. These values are then scaled and shifted to align with the desired means and variances of each variable, and any values outside medically plausible bounds are filtered out. 
 
-Idea behind copulas:
-
-- It is a mathematical object that has input as 2 or more marginal distributions and has output as a joint  distribution
-
-- If we have two probabilities that live on 0 -> 1, we can transform them into a higher space of 0 to infinity. Then when we add them together, they still live in the space of 0 to infinity. We take the inverse transformation of the sum, so the sum of the two probabilities will live on 0 -> 1 again.
-
-- If we use a negative log transformation (which will put any probability from 0 to 1 on a scale from 0 to infinity), the inverse will be negative exponential transformation (which brings anything from 0 to infinity back to 0 to 1).
-
-- If the two probabilities are independent, the joint probability is equal to the product of the individual probabilities (Frechet-Hoffding boundary copula). We're not so interested in it because we want to use copulas for distributions with correlation.
-
-- Copula allows distributions that have dependency to have flexibility. e.g. Gumbel copula - dependency increases with extreme positive values, which captures the dependency better than any multivariate distribution.
-
-- Gaussian copula transforms variables to standard normal distributions (mean = 0, variance = 1) by mapping them on a percentile-to-percentile basis. Those distributions are then combined to form a joint distribution 
-
-- The t-copula is derived from the multivariate t-distribution, just as the Gaussian copula comes from the multivariate normal. t-copula better captures the phenomenon of dependent extreme values (tail dependence)
-
-- Tail dependence is when the correlation between two variables increases as you get "further" in the tail (either or both) of the distribution. Gaussian copula has no tail dependence.
+We then map the uniform samples obtained from the copula to the quantiles of the heavy-tailed t-distributions.We verify the correlation between variables by computing the empirical correlation matrix and displaying it using a formatted table. Additionally, we use a pairs plot with `ggpairs` to visualize the relationships among the variables, with density plots along the diagonal and scatter plots with correlation coefficients.
 
 
-Medical Justification for Grouping Variables:  
 
-1. Glucose & Cholesterol (Metabolic Block)  
-These two variables are often correlated because they are both regulated by insulin and metabolic processes.  
-Patients with high glucose levels (e.g., in diabetes) often have elevated cholesterol due to metabolic dysfunction.  
-
-2. BMI & Blood Pressure (Cardiovascular Block)  
-Higher BMI is strongly associated with increased blood pressure, as obesity contributes to hypertension and cardiovascular disease.  
-This correlation reflects real-world epidemiological findings in obesity and hypertension studies.  
 
 ```{r t_copula_generation}
 rho_vec <- Sigma[lower.tri(Sigma)]  
@@ -155,13 +149,7 @@ corr_matrix <- cor(data_copula_t) %>% as.data.frame()
 knitr::kable(corr_matrix, caption = "Correlation Matrix of t_copula", digits = 3)
 ```
 
-
-A t-Copula is ideal for modeling correlated medical data with heavy tails, capturing realistic dependencies between variables.  
-
-Medical variables (glucose, cholesterol, BMI, blood pressure) often show heavy-tailed distributions.  
-The t-Copula ensures that extreme values tend to co-occur, reflecting real-world patterns (e.g., high glucose & high cholesterol in diabetes).  
-
-A Gaussian Copula assumes weak tail dependence, failing to model joint extremes properly.  
+ 
 
 ```{r visualize_t_copula}
 ggpairs(data_copula_t, 
@@ -172,8 +160,7 @@ ggpairs(data_copula_t,
   theme(plot.title = element_text(hjust = 0.5, face="bold", size=14))
 ```
 
-
-
+This figure shows a pairs plot of the four simulated variables—-Glucose, Cholesterol, BMI, and Blood Pressure that are generated from a t-copula with a specified block-diagonal correlation structure. Each panel along the diagonal shows the marginal distribution of a single variable. Glucose and Cholesterol peak around 100 mg/dL and 200 mg/dL respectively. Similarly, BMI and Blood Pressure center near 25 and 120 mmHg, and both pairs show relatively heavy tails. In the upper triangle of the figure, the panels report pairwise correlation coefficients, along with significance levels. The scatter plots in the lower triangle show that plots with higher correlations have elongated data clumps indicating linear relationships, and those with near-zero correlations have a more diffuse pattern. The figure demonstrates that our data generation procedure successfully captured both the heavy-tailed character of each marginal distribution and the specified block-diagonal correlation structure. 
 # 2. Implement your data generation method
 
 ```{r generate_data}
