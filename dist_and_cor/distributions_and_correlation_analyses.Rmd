@@ -730,7 +730,7 @@ As the degrees of freedom increased (i.e. less deviation from normality), the pr
 
 ### Simulation studies and procedures
 
-  For this simulation, robust regression was used to mitigate the influence of outliers and heavy-tailed distributions. It is useful when ordinary least squares assumptions don't hold up. Specifically, MM-estimation was performed because this method is useful when handling correlated and non-normal data. The model works by using two steps. The first step is an initial robust estimation with $\beta$ of high resistance to outliers, and the second step involves refining the estimate using a robust lost function. This form of regression downweigns the influence of outliers and works well with skewed data. MM-estimation robust regressing has a high breakdown point compared to other regression models, meaning a high fraction of outliers for which a model won't break down.
+  For this simulation, robust regression was used to mitigate the influence of outliers and heavy-tailed distributions. It is useful when ordinary least squares assumptions don't hold up. Specifically, MM-estimation was performed because this method is useful when handling correlated and non-normal data. The model works by using two steps. The first step is an initial robust estimation with $\beta$ of high resistance to outliers, and the second step involves refining the estimate using a robust lost function. This form of regression downweigns the influence of outliers and works well with hravy-tailrf data. MM-estimation robust regressing has a high breakdown point compared to other regression models, meaning a high fraction of outliers for which a model won't break down.
 \newline
 
 The model formula for MM-Robust regression is:
@@ -1050,10 +1050,28 @@ ggplot(results, aes(x = Scenario, y = Bias_Glucose, fill = Scenario)) +
 
 ## Discussion of models for simulation 2
 
+Overall, the MM robust regression method performed well across all of the above senarios. All of them converged and the generated model held. For the increase in smple size, the variance was reduced and the R squared value increased which is consistent with theory. Bias also increased. Increasing the correlation among predictors reduced variance and improved model fit (increased R Squared). When correlation was lowered, none of the predictors were significant, variance was increased, and the model did not git as well. When changing degrees of normality, the lower degree of freedom model increased bias and slightly improved the model fit, and increased degrees of freedom reduced bias but have little effect on the model fit. Lastly, the BMI effect model increased model fit, and the bias is less negative the the original data. 
 
 # Discussion
 # Key Takeaways
-*fill this in from the slides*
+Key Findings:
+Appropriateness of copula transformation to induce correlation
+Simulation Study 1
+When data violate model assumptions of iid and normality...
+Increasing sample size does not reduce bias
+Increases the probability of a Type I error
+More skewness/a greater deviation from normality in the data leads to...
+More bias in regression coefficient estimates
+Increased risk of a Type I error
+\newline
+Simulation Study 2
+\newlinw
+The correlated variable was the most significant in every model
+Highest R squared value was for the simulation with the highest correlation. MM- robust regression was succesfull for all simulations since it acounts for heavy-dated and correlated data. 
+\newline
+Take-home messages & practical recommendations:
+\newline
+Correct specification of a model is crucial to valid parameter estimates and statistical inference. When model assumptions are violated by the underlying correlation or distributional structures of the data, models which assume iid & Normal data produce invalid results.With knowledge of the underlying correlation and distributional structures, appropriate models can be chosen to achieve unbiased estimates and valid inference
 
 # Appendix: Robust Regression Outputs
 ### Original Data 
@@ -1132,8 +1150,13 @@ summary(bmi_model)
 
 ## References
 
-http://dx.doi.org/10.12732/ijpam.v91i3.7
 
 Ahmadi, A., Baghfalaki, T., Ganjali, M., Kabir, A., & Pazouki, A. (2021). A transition copula model for analyzing multivariate longitudinal data with missing responses. Journal of applied statistics, 49(12), 3164–3177. https://doi.org/10.1080/02664763.2021.1931055  
 
 Palomar, D. P., Zhou, R., & Wang, X. (2023, April 29). Mean Vector and Covariance Matrix Estimation under Heavy Tails. https://cran.r-project.org/web/packages/fitHeavyTail/vignettes/CovarianceEstimationHeavyTail.html
+
+Huber, P. J. (1981). Robust Statistics. Wiley.
+
+Yohai, V. J. (1987). High breakdown-point and high efficiency robust estimates for regression. The Annals of Statistics, 15(2), 642–656.
+
+Rousseeuw, P. J., & Leroy, A. M. (1987). Robust Regression and Outlier Detection. Wiley.
